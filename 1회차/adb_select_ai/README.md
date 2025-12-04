@@ -172,6 +172,14 @@ CREATE TABLE CATEGORIES (
     CATEGORY_NAME VARCHAR2(15),
     DESCRIPTION VARCHAR2(300)
 );
+
+COMMENT ON TABLE CATEGORIES IS
+'Product categories. Each category groups similar types of products. Used to classify products in the PRODUCTS table.';
+
+COMMENT ON COLUMN CATEGORIES.CATEGORY_ID IS 'Primary key. Unique identifier for each product category.';
+COMMENT ON COLUMN CATEGORIES.CATEGORY_NAME IS 'Name of the category (e.g., Beverages, Condiments).';
+COMMENT ON COLUMN CATEGORIES.DESCRIPTION IS 'Optional description of the category.';
+
 ```
 ```
 -- 2. Customers 테이블 생성
@@ -188,6 +196,22 @@ CREATE TABLE CUSTOMERS (
     PHONE VARCHAR2(24),
     FAX VARCHAR2(24)
 );
+
+COMMENT ON TABLE CUSTOMERS IS
+'List of customers who place orders. Linked to ORDERS table through CUSTOMER_ID.';
+
+COMMENT ON COLUMN CUSTOMERS.CUSTOMER_ID IS 'Primary key. Unique code for each customer.';
+COMMENT ON COLUMN CUSTOMERS.COMPANY_NAME IS 'Customer company name.';
+COMMENT ON COLUMN CUSTOMERS.CONTACT_NAME IS 'Main contact person at the customer company.';
+COMMENT ON COLUMN CUSTOMERS.CONTACT_TITLE IS 'Job title of the contact person.';
+COMMENT ON COLUMN CUSTOMERS.ADDRESS IS 'Customer address.';
+COMMENT ON COLUMN CUSTOMERS.CITY IS 'City of the customer.';
+COMMENT ON COLUMN CUSTOMERS.REGION IS 'Region/state of the customer.';
+COMMENT ON COLUMN CUSTOMERS.POSTAL_CODE IS 'Postal/ZIP code.';
+COMMENT ON COLUMN CUSTOMERS.COUNTRY IS 'Country of the customer.';
+COMMENT ON COLUMN CUSTOMERS.PHONE IS 'Customer phone number.';
+COMMENT ON COLUMN CUSTOMERS.FAX IS 'Customer fax number.';
+
 ```
 ```
 -- 3. Products 테이블 생성
@@ -204,6 +228,21 @@ CREATE TABLE PRODUCTS (
     DISCONTINUED NUMBER(1),
     FOREIGN KEY (CATEGORY_ID) REFERENCES CATEGORIES(CATEGORY_ID)
 );
+
+COMMENT ON TABLE PRODUCTS IS
+'Products available for sale. Linked to CATEGORIES via CATEGORY_ID and to ORDER_DETAILS via PRODUCT_ID.';
+
+COMMENT ON COLUMN PRODUCTS.PRODUCT_ID IS 'Primary key. Unique identifier for each product.';
+COMMENT ON COLUMN PRODUCTS.PRODUCT_NAME IS 'Name of the product.';
+COMMENT ON COLUMN PRODUCTS.SUPPLIER_ID IS 'Identifier for the supplier (not defined in this schema).';
+COMMENT ON COLUMN PRODUCTS.CATEGORY_ID IS 'Foreign key referencing CATEGORIES(CATEGORY_ID). Indicates the product category.';
+COMMENT ON COLUMN PRODUCTS.QUANTITY_PER_UNIT IS 'Description of quantity per unit (e.g., 24 - 12 oz bottles).';
+COMMENT ON COLUMN PRODUCTS.UNIT_PRICE IS 'Price per unit of the product.';
+COMMENT ON COLUMN PRODUCTS.UNITS_IN_STOCK IS 'Current inventory level.';
+COMMENT ON COLUMN PRODUCTS.UNITS_ON_ORDER IS 'Units ordered but not yet received.';
+COMMENT ON COLUMN PRODUCTS.REORDER_LEVEL IS 'Minimum stock level before reorder is required.';
+COMMENT ON COLUMN PRODUCTS.DISCONTINUED IS 'Whether the product is discontinued (0 = no, 1 = yes).';
+
 ```
 ```
 -- 4. Orders 테이블 생성
@@ -224,6 +263,25 @@ CREATE TABLE ORDERS (
     SHIP_COUNTRY VARCHAR2(15),
     FOREIGN KEY (CUSTOMER_ID) REFERENCES CUSTOMERS(CUSTOMER_ID)
 );
+
+COMMENT ON TABLE ORDERS IS
+'Customer orders. Each order may contain multiple products through ORDER_DETAILS.';
+
+COMMENT ON COLUMN ORDERS.ORDER_ID IS 'Primary key. Unique identifier for each order.';
+COMMENT ON COLUMN ORDERS.CUSTOMER_ID IS 'Foreign key referencing CUSTOMERS(CUSTOMER_ID). Identifies the customer who placed the order.';
+COMMENT ON COLUMN ORDERS.EMPLOYEE_ID IS 'Employee handling the order (not defined in this schema).';
+COMMENT ON COLUMN ORDERS.ORDER_DATE IS 'Date when the order was placed.';
+COMMENT ON COLUMN ORDERS.REQUIRED_DATE IS 'Date when the order is required.';
+COMMENT ON COLUMN ORDERS.SHIPPED_DATE IS 'Date when the order was shipped.';
+COMMENT ON COLUMN ORDERS.SHIP_VIA IS 'Shipping method identifier.';
+COMMENT ON COLUMN ORDERS.FREIGHT IS 'Shipping cost.';
+COMMENT ON COLUMN ORDERS.SHIP_NAME IS 'Name of the shipping contact/';
+COMMENT ON COLUMN ORDERS.SHIP_ADDRESS IS 'Shipping address.';
+COMMENT ON COLUMN ORDERS.SHIP_CITY IS 'Shipping city.';
+COMMENT ON COLUMN ORDERS.SHIP_REGION IS 'Shipping region/state.';
+COMMENT ON COLUMN ORDERS.SHIP_POSTAL_CODE IS 'Shipping ZIP/postal code.';
+COMMENT ON COLUMN ORDERS.SHIP_COUNTRY IS 'Shipping country.';
+
 ```
 ```
 -- 5. Order Details 테이블 생성
@@ -237,6 +295,16 @@ CREATE TABLE ORDER_DETAILS (
     FOREIGN KEY (ORDER_ID) REFERENCES ORDERS(ORDER_ID),
     FOREIGN KEY (PRODUCT_ID) REFERENCES PRODUCTS(PRODUCT_ID)
 );
+
+COMMENT ON TABLE ORDER_DETAILS IS
+'Line items of each order. Links ORDERS and PRODUCTS. Stores quantity, price, and discount for each product in an order.';
+
+COMMENT ON COLUMN ORDER_DETAILS.ORDER_ID IS 'Foreign key referencing ORDERS(ORDER_ID). Identifies the order.';
+COMMENT ON COLUMN ORDER_DETAILS.PRODUCT_ID IS 'Foreign key referencing PRODUCTS(PRODUCT_ID). Identifies the product.';
+COMMENT ON COLUMN ORDER_DETAILS.UNIT_PRICE IS 'Unit price at the time of order (may differ from current price).';
+COMMENT ON COLUMN ORDER_DETAILS.QUANTITY IS 'Quantity of the product ordered.';
+COMMENT ON COLUMN ORDER_DETAILS.DISCOUNT IS 'Discount applied (0 to 1).';
+
 ```
 ```
 -- 6. 데이터 입력 (샘플 데이터)
@@ -323,6 +391,11 @@ API Key 관리 없이 IAM 권한으로 인증하는 가장 안전한 방식입�
     - 설정 정보 확인 (Tenancy OCID, User OCID, Fingerprint).
 ```
 BEGIN
+  DBMS_CLOUD.DROP_CREDENTIAL('OCI_KEY_CRED');
+END;
+/
+
+BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'OCI_KEY_CRED',
     user_ocid       => 'ocid1.user.oc1..aaaa...',  -- 사용자 OCID
@@ -396,7 +469,7 @@ BEGIN
         profile_name => 'NORTHWIND_AI',
         attributes   => '{
             "provider": "oci",
-            "model": "openai.gpt-oss-20b",
+            "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
             "credential_name": "OCI_KEY_CRED",
             "comments": false,
             "object_list": [
@@ -439,17 +512,17 @@ EXEC DBMS_CLOUD_AI.SET_PROFILE('northwind_ai');
 
 ```
 -- 2. 단순 조회
-SELECT AI What is the product with the most stock?;
+SELECT AI 'What is the product with the most stock?';
 ```
 
 ```
 -- 3. 집계 및 분석
-SELECT AI What is the total sales amount for the "Beverages" category?;
+SELECT AI 'What is the total sales amount for the "Beverages" category?';
 ```
 
 ```
 -- 4. 쿼리 검증 (생성된 SQL 확인)
-SELECT AI showsql What is the total sales amount for the "Beverages" category?;
+SELECT AI showsql 'What is the total sales amount for the "Beverages" category?';
 ```
 
 ##### 5. 고급 기능 실습 (Advanced SQL Features)
@@ -473,7 +546,7 @@ END;
 ```
 ```
 -- 생성된 데이터 확인
-SELECT * FROM product;
+SELECT * FROM products;
 ```
 
 ###### 5.2 Feedback (피드백 제공)
@@ -589,6 +662,8 @@ print("✓ Connected securely using Wallet")
 위 코드를 `db_conn.py` 파일로 저장한 후 실행:
 
 ```bash
+uv init
+uv add select_ai
 uv run db_conn.py
 ```
 
@@ -599,7 +674,6 @@ PL/SQL에서 생성한 프로파일을 Python 객체로 불러와 기본 동작�
 
 ```python
 import os
-import select_ai
 
 # 환경 변수 설정 (실제 값으로 교체 필요)
 WALLET_DIR = os.getenv("WALLET_DIR", "/path/to/your/wallet")
@@ -608,16 +682,20 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "your_password")
 DB_DSN = os.getenv("DB_DSN", "your_dsn_low")
 WALLET_PASSWORD = os.getenv("WALLET_PASSWORD", "your_wallet_password")
 
-# TNS_ADMIN 설정 (oracledb 로드 전에 필수)
+# TNS_ADMIN 설정 (oracledb 로드 전에 필수) - MUST be set BEFORE importing select_ai
 os.environ['TNS_ADMIN'] = WALLET_DIR
+print(f"TNS_ADMIN: {WALLET_DIR}")
+
+# Now import select_ai AFTER TNS_ADMIN is set
+import select_ai
 
 # 데이터베이스 연결
 select_ai.connect(
     user=DB_USER,
-    password=DB_PASSWORD,
-    dsn=DB_DSN,
+    password=DB_PASSWORD,  # 실제 비밀번호로 변경
+    dsn=DB_DSN,  # tnsnames.ora 파일 안의 서비스 별칭
     wallet_location=WALLET_DIR,
-    wallet_password=WALLET_PASSWORD
+    wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
 )
 print("Connected to database")
 
