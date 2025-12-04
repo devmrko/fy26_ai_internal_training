@@ -742,12 +742,13 @@ uv run test_connection.py
 
 ```python
 import os
-import select_ai
-from select_ai import Conversation, ConversationAttributes
 
 # 환경 설정
 WALLET_DIR = os.getenv("WALLET_DIR", "/path/to/your/wallet")
 os.environ['TNS_ADMIN'] = WALLET_DIR
+
+import select_ai
+from select_ai import Conversation, ConversationAttributes
 
 # 데이터베이스 연결
 select_ai.connect(
@@ -806,18 +807,23 @@ print("✓ Conversation completed")
 
 ```python
 import os
+
+WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
+
+os.environ['TNS_ADMIN'] = WALLET_DIR
+print(f"TNS_ADMIN: {WALLET_DIR}")
+
 import select_ai
 from select_ai import SyntheticDataAttributes, SyntheticDataParams
 
 # 연결 (이미 연결되어 있다면 생략 가능)
 if not select_ai.is_connected():
-    os.environ['TNS_ADMIN'] = os.getenv("WALLET_DIR")
     select_ai.connect(
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        dsn=os.getenv("DB_DSN"),
-        wallet_location=os.getenv("WALLET_DIR"),
-        wallet_password=os.getenv("WALLET_PASSWORD")
+        user="NORTHWIND",
+        password="Welcome12345#",  # 실제 비밀번호로 변경
+        dsn="jtc0w11kmdnyykbj_low",  # tnsnames.ora 파일 안의 서비스 별칭
+        wallet_location=WALLET_DIR,
+        wallet_password="Dhfkzmf#12345"  # 지갑 다운로드 시 설정한 비밀번호
     )
 
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
@@ -870,19 +876,23 @@ except Exception as e:
 
 ```python
 import os
-import select_ai
 
-# 환경 설정
-os.environ['TNS_ADMIN'] = os.getenv("WALLET_DIR")
+WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
+
+os.environ['TNS_ADMIN'] = WALLET_DIR
+print(f"TNS_ADMIN: {WALLET_DIR}")
+
+import select_ai
+from select_ai import SyntheticDataAttributes, SyntheticDataParams
 
 # 연결 (이미 연결되어 있다면 생략 가능)
 if not select_ai.is_connected():
     select_ai.connect(
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        dsn=os.getenv("DB_DSN"),
-        wallet_location=os.getenv("WALLET_DIR"),
-        wallet_password=os.getenv("WALLET_PASSWORD")
+        user="NORTHWIND",
+        password="Welcome12345#",  # 실제 비밀번호로 변경
+        dsn="jtc0w11kmdnyykbj_low",  # tnsnames.ora 파일 안의 서비스 별칭
+        wallet_location=WALLET_DIR,
+        wallet_password="Dhfkzmf#12345"  # 지갑 다운로드 시 설정한 비밀번호
     )
 
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
