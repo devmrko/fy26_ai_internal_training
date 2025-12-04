@@ -1,0 +1,1 @@
+강의자료: kttp://thekoguryo.github.io/oracle-ai-ttt
