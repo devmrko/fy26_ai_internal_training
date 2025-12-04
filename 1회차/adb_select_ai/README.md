@@ -1105,7 +1105,7 @@ uv run summarize.py
 - app.py 파일 생성
 다음 코드를 복사하여 app.py 파일로 저장합니다.
 
-```
+```python
 """
 Northwind Data Assistant - Oracle Select AI Chatbot
 Simple, modular, and easy to read
@@ -1581,7 +1581,7 @@ uv add 명령은 패키지를 설치하고 pyproject.toml에 의존성을 자동
 fastmcp를 사용하여 Select AI의 핵심 기능(자연어 질의, 피드백)을 도구(Tool)로 노출하는 서버 코드를 작성합니다.
 프로젝트 루트에 mcp_server.py 파일을 생성하고 다음 코드를 작성합니다.
 
-```
+```python
 """
 Oracle Select AI MCP Server
 Simple interface to query Oracle database using natural language
