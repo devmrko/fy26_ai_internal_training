@@ -1,22 +1,46 @@
 import os
+from dotenv import load_dotenv
 
-WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
+# .env 파일 로드
+load_dotenv()
 
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
 os.environ['TNS_ADMIN'] = WALLET_DIR
-print(f"TNS_ADMIN: {WALLET_DIR}")
 
+# 이제 select_ai를 import (TNS_ADMIN이 설정된 후)
 import select_ai
-from select_ai import SyntheticDataAttributes, SyntheticDataParams
 
-# 연결 (이미 연결되어 있다면 생략 가능)
-if not select_ai.is_connected():
-    select_ai.connect(
-        user="NORTHWIND",
-        password="Welcome12345#",  # 실제 비밀번호로 변경
-        dsn="jtc0w11kmdnyykbj_low",  # tnsnames.ora 파일 안의 서비스 별칭
-        wallet_location=WALLET_DIR,
-        wallet_password="Dhfkzmf#12345"  # 지갑 다운로드 시 설정한 비밀번호
-    )
+# 연결 시도
+select_ai.connect(
+    user=DB_USER,
+    password=DB_PASSWORD,  # 실제 비밀번호로 변경
+    dsn=DB_DSN,  # tnsnames.ora 파일 안의 서비스 별칭
+    wallet_location=WALLET_DIR,
+    wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
+)
+print("Connected securely using Wallet")
+
+from select_ai import SyntheticDataAttributes, SyntheticDataParams 
 
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
 
@@ -40,7 +64,9 @@ except Exception as e:
     print(f"✗ 요약 실패: {e}\n")
     summary = long_text  # 실패 시 원문 사용
 
-# 2. 번역 (Translate) - chat 메서드 사용
+# 2. 번역 (Translate) - chat 메서드 사용 (권장)
+# 참고: Python SDK의 Action enum에는 TRANSLATE가 없습니다.
+# 사용 가능한 Actions: RUNSQL, SHOWSQL, EXPLAINSQL, NARRATE, CHAT, SHOWPROMPT, FEEDBACK, SUMMARIZE
 print("한국어로 번역 중...")
 try:
     translation = profile.chat(
@@ -49,15 +75,3 @@ try:
     print(f"✓ 번역 완료:\n{translation}\n")
 except Exception as e:
     print(f"✗ 번역 실패: {e}\n")
-
-# 3. 데이터베이스 내용 요약 예제
-print("데이터베이스 쿼리 결과 요약...")
-try:
-    # 제품 정보를 조회하여 요약
-    query_result = profile.chat(
-        "Summarize the product catalog in 2-3 sentences, "
-        "focusing on product categories and price ranges."
-    )
-    print(f"✓ 제품 카탈로그 요약:\n{query_result}")
-except Exception as e:
-    print(f"✗ 쿼리 요약 실패: {e}")

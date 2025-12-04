@@ -3,37 +3,43 @@ Northwind Data Assistant - Oracle Select AI Chatbot
 Simple, modular, and easy to read
 """
 
-import streamlit as st
 import os
+from dotenv import load_dotenv
+
+# ⚠️ 중요: TNS_ADMIN을 oracledb/select_ai 임포트 전에 설정해야 함!
+
+# .env 파일 로드
+load_dotenv()
+
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
+os.environ['TNS_ADMIN'] = WALLET_DIR
+print(f"✓ TNS_ADMIN 설정됨: {WALLET_DIR}")
+print(f"✓ DB_DSN: {DB_DSN}")
+
+# 이제 다른 모듈들을 import (TNS_ADMIN이 설정된 후)
+import streamlit as st
 import pandas as pd
 import oracledb
-
-WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
-
-os.environ['TNS_ADMIN'] = WALLET_DIR
-print(f"TNS_ADMIN: {WALLET_DIR}")
-
-# ============================================================================
-# CONFIGURATION - 환경 변수 또는 직접 설정
-# ============================================================================
-
-# 방법 1: 환경 변수 사용 (권장)
-WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
-DB_USER = os.getenv("DB_USER", "NORTHWIND")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "Welcome12345#")
-DB_DSN = os.getenv("DB_DSN", "jtc0w11kmdnyykbj_low")
-WALLET_PASSWORD = os.getenv("WALLET_PASSWORD", "Dhfkzmf#12345")
-
-# 방법 2: 직접 설정 (보안에 주의)
-# WALLET_DIR = "/Users/yourname/wallet"
-# DB_USER = "NORTHWIND"
-# DB_PASSWORD = "your_actual_password"
-# DB_DSN = "your_adb_service_low"
-# WALLET_PASSWORD = "your_wallet_password"
-
-# Set TNS_ADMIN before importing select_ai
-os.environ['TNS_ADMIN'] = WALLET_DIR
-
 import select_ai
 
 # ============================================================================
@@ -43,7 +49,6 @@ import select_ai
 def connect_to_database():
     """Connect to Oracle database"""
     try:
-        # Check if already connected
         if not select_ai.is_connected():
             select_ai.connect(
                 user=DB_USER,
@@ -52,8 +57,10 @@ def connect_to_database():
                 wallet_location=WALLET_DIR,
                 wallet_password=WALLET_PASSWORD
             )
+            print("✓ 데이터베이스 연결 성공!")
         return True, None
     except Exception as e:
+        print(f"❌ 연결 실패: {e}")
         return False, str(e)
 
 
@@ -254,11 +261,29 @@ def setup_sidebar():
         
         # AI Profile
         st.subheader("🎯 AI Profile")
-        profile = st.selectbox(
-            "Select Profile",
-            ["NORTHWIND_AI"],
-            help="NORTHWIND_AI is recommended"
-        )
+        
+        # Get available profiles from database
+        try:
+            profile_objects = select_ai.Profile.list()
+            if profile_objects:
+                # Extract profile names from profile objects
+                available_profiles = [p.profile_name for p in profile_objects]
+            else:
+                st.warning("⚠️ No profiles found in database")
+                available_profiles = ["NORTHWIND_AI"]  # fallback
+            
+            profile = st.selectbox(
+                "Select Profile",
+                available_profiles,
+                help="Select an AI profile configured in your database"
+            )
+        except Exception as e:
+            st.warning(f"⚠️ Could not fetch profiles: {e}")
+            profile = st.selectbox(
+                "Select Profile",
+                ["NORTHWIND_AI"],
+                help="Using default profile"
+            )
         
         # Query Mode
         st.subheader("💬 Mode")

@@ -627,7 +627,7 @@ Python SDK(select_ai)를 활용하여 애플리케이션 레벨에서 Select AI�
 - 사용 할 라이브러리 설치
 ```
 uv init
-uv add select_ai oracledb streamlit
+uv add dotenv select_ai oracledb streamlit
 ```
 - Wallet을 이용한 연결
   - 사전 준비:
@@ -636,25 +636,55 @@ uv add select_ai oracledb streamlit
     3. 다운로드한 파일의 압축을 풀고 경로를 기억해둡니다. (예: /Users/me/wallet_adb)
     4. select_ai.connect 함수에 wallet_location 파라미터를 추가하여 연결합니다.
 
+- .env 에서 아래 항목에 해당하는 정보를 저장하여 이 정보를 아래 python code에서 활용하도록 합니다.
+```
+WALLET_DIR=
+DB_USER=
+DB_PASSWORD=
+DB_DSN=
+WALLET_PASSWORD=
+```
+
 ```python
 import os
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 # 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
-wallet_dir = "/Users/joungminko/devkit/db_conn/Wallet_HZEBYD2J0MRJVM7H" 
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
 
 # TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
-os.environ['TNS_ADMIN'] = wallet_dir
+os.environ['TNS_ADMIN'] = WALLET_DIR
 
 # 이제 select_ai를 import (TNS_ADMIN이 설정된 후)
 import select_ai
 
 # 연결 시도
 select_ai.connect(
-    user="NORTHWIND",
-    password="your_password",  # 실제 비밀번호로 변경
-    dsn="your_service_name_low",  # tnsnames.ora 파일 안의 서비스 별칭
-    wallet_location=wallet_dir,
-    wallet_password="your_wallet_password"  # 지갑 다운로드 시 설정한 비밀번호
+    user=DB_USER,
+    password=DB_PASSWORD,  # 실제 비밀번호로 변경
+    dsn=DB_DSN,  # tnsnames.ora 파일 안의 서비스 별칭
+    wallet_location=WALLET_DIR,
+    wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
 )
 print("✓ Connected securely using Wallet")
 ```
@@ -663,7 +693,7 @@ print("✓ Connected securely using Wallet")
 
 ```bash
 uv init
-uv add select_ai
+uv add dotenv select_ai
 uv run db_conn.py
 ```
 
@@ -673,23 +703,39 @@ PL/SQL에서 생성한 프로파일을 Python 객체로 불러와 기본 동작�
 ###### 2.1 기본 연결 및 프로파일 사용
 
 ```python
-import os
+iimport os
+from dotenv import load_dotenv
 
-# 환경 변수 설정 (실제 값으로 교체 필요)
-WALLET_DIR = os.getenv("WALLET_DIR", "/path/to/your/wallet")
-DB_USER = os.getenv("DB_USER", "NORTHWIND")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "your_password")
-DB_DSN = os.getenv("DB_DSN", "your_dsn_low")
-WALLET_PASSWORD = os.getenv("WALLET_PASSWORD", "your_wallet_password")
+# .env 파일 로드
+load_dotenv()
 
-# TNS_ADMIN 설정 (oracledb 로드 전에 필수) - MUST be set BEFORE importing select_ai
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
 os.environ['TNS_ADMIN'] = WALLET_DIR
-print(f"TNS_ADMIN: {WALLET_DIR}")
 
-# Now import select_ai AFTER TNS_ADMIN is set
+# 이제 select_ai를 import (TNS_ADMIN이 설정된 후)
 import select_ai
 
-# 데이터베이스 연결
+# 연결 시도
 select_ai.connect(
     user=DB_USER,
     password=DB_PASSWORD,  # 실제 비밀번호로 변경
@@ -697,7 +743,7 @@ select_ai.connect(
     wallet_location=WALLET_DIR,
     wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
 )
-print("Connected to database")
+print("Connected securely using Wallet")
 
 # 프로파일 로드
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
@@ -724,14 +770,8 @@ print(f"\nDatabase Info: {info}")
 위 코드를 `test_connection.py` 파일로 저장하고 실행:
 
 ```bash
-# 환경 변수 설정 (예시)
-export WALLET_DIR="/Users/yourname/wallet"
-export DB_USER="NORTHWIND"
-export DB_PASSWORD="YourPassword#123"
-export DB_DSN="yourdb_low"
-export WALLET_PASSWORD="YourWalletPass"
-
-# 실행
+uv init
+uv add dotenv select_ai
 uv run test_connection.py
 ```
 
@@ -742,23 +782,48 @@ uv run test_connection.py
 
 ```python
 import os
+from dotenv import load_dotenv
 
-# 환경 설정
-WALLET_DIR = os.getenv("WALLET_DIR", "/path/to/your/wallet")
+# .env 파일 로드
+load_dotenv()
+
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
 os.environ['TNS_ADMIN'] = WALLET_DIR
 
+# 이제 select_ai를 import (TNS_ADMIN이 설정된 후)
 import select_ai
-from select_ai import Conversation, ConversationAttributes
 
-# 데이터베이스 연결
+# 연결 시도
 select_ai.connect(
-    user=os.getenv("DB_USER", "NORTHWIND"),
-    password=os.getenv("DB_PASSWORD"),
-    dsn=os.getenv("DB_DSN"),
+    user=DB_USER,
+    password=DB_PASSWORD,  # 실제 비밀번호로 변경
+    dsn=DB_DSN,  # tnsnames.ora 파일 안의 서비스 별칭
     wallet_location=WALLET_DIR,
-    wallet_password=os.getenv("WALLET_PASSWORD")
+    wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
 )
-print("Connected to database")
+print("Connected securely using Wallet")
+
+from select_ai import Conversation, ConversationAttributes
 
 # 프로파일 로드
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
@@ -772,28 +837,69 @@ conv_attr = ConversationAttributes(
 # 2. 대화 객체 생성 및 등록
 conversation = Conversation(attributes=conv_attr)
 conv_id = conversation.create()
-print(f"Conversation created - Session ID: {conv_id}\n")
+print(f"대화 생성 완료 - 세션 ID: {conv_id}\n")
 
-# 3. 대화 시작 (문맥 유지)
-print("=== 대화형 컨텍스트 테스트 ===\n")
+# 3. 대화 시작 (narrate로 데이터 조회 → chat으로 의견 교환)
+print("=== 시나리오: narrate()로 DB 조회, chat()으로 LLM 의견 수렴 ===\n")
 
 with profile.chat_session(conversation=conversation) as session:
-    # Q1: 첫 번째 질문 - 대상 확인
-    print("User: 'Beverages' 카테고리에 어떤 제품들이 있어?")
-    res1 = session.chat("List products in Beverages category")
-    print(f"AI: {res1}\n")
-
-    # Q2: 문맥 질문 ('그 중에서' -> 이전 답변의 Beverages 제품들을 기억)
-    print(" User: 그 중에서 재고가 가장 적은 건 뭐야?")
-    res2 = session.chat("Which one has the lowest stock?")
-    print(f"AI: {res2}\n")
     
-    # Q3: 추가 추론 질문 (이전 대화 내용 기반)
-    print("User: 그걸 채우려면 얼마나 더 주문해야 할까?")
-    res3 = session.chat("Considering units on order, do we need to order more?")
-    print(f"AI: {res3}\n")
+    # ==========================================
+    # 단계 1: narrate()로 실제 데이터 조회
+    # ==========================================
+    print("=" * 60)
+    print("단계 1: narrate()로 DB에서 실제 데이터 조회")
+    print("=" * 60)
+    
+    print("\n[DB 쿼리] Beverages 카테고리 제품 재고 조회 중...")
+    db_query = "List all products in the Beverages category with their unit price, units in stock, and units on order"
+    beverages_data = profile.narrate(db_query)
+    print(f"\n📊 데이터베이스 조회 결과:\n{beverages_data}\n")
+    
+    # ==========================================
+    # 단계 2: chat()으로 LLM 분석 및 의견 받기
+    # ==========================================
+    print("=" * 60)
+    print("단계 2: chat()으로 LLM에게 데이터 분석 요청")
+    print("=" * 60)
+    
+    print("\n[사용자] 재고 데이터 분석 요청...")
+    analysis_request = f"""다음 Beverages 재고 데이터를 간단히 분석해주세요:
 
-print("✓ Conversation completed")
+{beverages_data}
+
+가장 우려되는 제품과 이유, 그리고 개선 방안을 3-4문장으로 요약해주세요."""
+    
+    analysis = session.chat(analysis_request)
+    print(f"\n🤖 LLM 분석:\n{analysis}\n")
+    
+    # ==========================================
+    # 단계 3: 추가 질문 (대화 맥락 유지)
+    # ==========================================
+    print("=" * 60)
+    print("단계 3: 대화 맥락을 유지하며 추가 질문")
+    print("=" * 60)
+    
+    print("\n[사용자] 우선순위 질문...")
+    priority_question = session.chat("가장 먼저 재주문해야 할 제품을 1-2개만 간단히 추천해주세요.")
+    print(f"\n🤖 LLM 답변:\n{priority_question}\n")
+
+print("=" * 60)
+print("✓ 대화 완료")
+print("=" * 60)
+print("\n💡 요약:")
+print("  1. narrate() → DB에서 실제 재고 데이터 조회")
+print("  2. chat() → LLM에게 데이터 분석 및 의견 요청")
+print("  3. chat() → 대화 맥락 유지하며 추가 질문")
+print("\n✨ narrate()는 팩트(데이터), chat()은 인사이트(분석)를 제공합니다!")
+```
+
+위 코드를 `chat.py` 파일로 저장하고 실행:
+
+```bash
+uv init
+uv add dotenv select_ai
+uv run chat.py
 ```
 
 **주요 특징:**
@@ -807,24 +913,48 @@ print("✓ Conversation completed")
 
 ```python
 import os
+from dotenv import load_dotenv
 
-WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
+# .env 파일 로드
+load_dotenv()
 
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
 os.environ['TNS_ADMIN'] = WALLET_DIR
-print(f"TNS_ADMIN: {WALLET_DIR}")
 
+# 이제 select_ai를 import (TNS_ADMIN이 설정된 후)
 import select_ai
-from select_ai import SyntheticDataAttributes, SyntheticDataParams
 
-# 연결 (이미 연결되어 있다면 생략 가능)
-if not select_ai.is_connected():
-    select_ai.connect(
-        user="NORTHWIND",
-        password="Welcome12345#",  # 실제 비밀번호로 변경
-        dsn="jtc0w11kmdnyykbj_low",  # tnsnames.ora 파일 안의 서비스 별칭
-        wallet_location=WALLET_DIR,
-        wallet_password="Dhfkzmf#12345"  # 지갑 다운로드 시 설정한 비밀번호
-    )
+# 연결 시도
+select_ai.connect(
+    user=DB_USER,
+    password=DB_PASSWORD,  # 실제 비밀번호로 변경
+    dsn=DB_DSN,  # tnsnames.ora 파일 안의 서비스 별칭
+    wallet_location=WALLET_DIR,
+    wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
+)
+print("Connected securely using Wallet")
+
+from select_ai import SyntheticDataAttributes, SyntheticDataParams
 
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
 
@@ -839,7 +969,7 @@ syn_params = SyntheticDataParams(
 syn_attr = SyntheticDataAttributes(
     object_name="CUSTOMERS",
     owner_name="NORTHWIND",
-    record_count=1,     # 3개의 가상 고객 생성
+    record_count=3,     # 3개의 가상 고객 생성
     user_prompt="Generate realistic customer data for a European food trading company. Include diverse countries and contact information.",
     params=syn_params
 )
@@ -850,12 +980,11 @@ try:
     print("생성 완료!\n")
     
     # 결과 확인
-    print("최근 추가된 고객 5명:")
+    print("최근 추가된 고객 3명:")
     result = profile.run_sql(
         "SELECT CUSTOMER_ID, COMPANY_NAME, CONTACT_NAME, CITY, COUNTRY "
         "FROM CUSTOMERS "
         "ORDER BY CUSTOMER_ID DESC "
-        "FETCH FIRST 5 ROWS ONLY"
     )
     print(result)
     
@@ -863,6 +992,12 @@ except Exception as e:
     print(f"✗ 실패: {e}")
     import traceback
     traceback.print_exc()
+```
+
+```bash
+uv init
+uv add dotenv select_ai
+uv run synthetic_data.py
 ```
 
 **주요 파라미터 설명:**
@@ -876,24 +1011,48 @@ except Exception as e:
 
 ```python
 import os
+from dotenv import load_dotenv
 
-WALLET_DIR = os.getenv("WALLET_DIR", "/Users/joungminko/devkit/db_conn/Wallet_JTC0W11KMDNYYKBJ")
+# .env 파일 로드
+load_dotenv()
 
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
 os.environ['TNS_ADMIN'] = WALLET_DIR
-print(f"TNS_ADMIN: {WALLET_DIR}")
 
+# 이제 select_ai를 import (TNS_ADMIN이 설정된 후)
 import select_ai
-from select_ai import SyntheticDataAttributes, SyntheticDataParams
 
-# 연결 (이미 연결되어 있다면 생략 가능)
-if not select_ai.is_connected():
-    select_ai.connect(
-        user="NORTHWIND",
-        password="Welcome12345#",  # 실제 비밀번호로 변경
-        dsn="jtc0w11kmdnyykbj_low",  # tnsnames.ora 파일 안의 서비스 별칭
-        wallet_location=WALLET_DIR,
-        wallet_password="Dhfkzmf#12345"  # 지갑 다운로드 시 설정한 비밀번호
-    )
+# 연결 시도
+select_ai.connect(
+    user=DB_USER,
+    password=DB_PASSWORD,  # 실제 비밀번호로 변경
+    dsn=DB_DSN,  # tnsnames.ora 파일 안의 서비스 별칭
+    wallet_location=WALLET_DIR,
+    wallet_password=WALLET_PASSWORD  # 지갑 다운로드 시 설정한 비밀번호
+)
+print("Connected securely using Wallet")
+
+from select_ai import SyntheticDataAttributes, SyntheticDataParams 
 
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
 
@@ -917,7 +1076,9 @@ except Exception as e:
     print(f"✗ 요약 실패: {e}\n")
     summary = long_text  # 실패 시 원문 사용
 
-# 2. 번역 (Translate) - chat 메서드 사용
+# 2. 번역 (Translate) - chat 메서드 사용 (권장)
+# 참고: Python SDK의 Action enum에는 TRANSLATE가 없습니다.
+# 사용 가능한 Actions: RUNSQL, SHOWSQL, EXPLAINSQL, NARRATE, CHAT, SHOWPROMPT, FEEDBACK, SUMMARIZE
 print("한국어로 번역 중...")
 try:
     translation = profile.chat(
@@ -926,24 +1087,17 @@ try:
     print(f"✓ 번역 완료:\n{translation}\n")
 except Exception as e:
     print(f"✗ 번역 실패: {e}\n")
+```
 
-# 3. 데이터베이스 내용 요약 예제
-print("데이터베이스 쿼리 결과 요약...")
-try:
-    # 제품 정보를 조회하여 요약
-    query_result = profile.chat(
-        "Summarize the product catalog in 2-3 sentences, "
-        "focusing on product categories and price ranges."
-    )
-    print(f"✓ 제품 카탈로그 요약:\n{query_result}")
-except Exception as e:
-    print(f"✗ 쿼리 요약 실패: {e}")
+```bash
+uv init
+uv add dotenv select_ai
+uv run summarize.py
 ```
 
 **사용 가능한 메서드:**
 - `profile.summarize(content=텍스트)`: 텍스트 요약
 - `profile.chat(질문)`: 자유 대화 (번역, 설명 등)
-- `profile.narrate(질문)`: 데이터 조회 + 자연어 설명
  
 ##### 4. [Bonus] Streamlit을 활용한 AI Chatbot GUI 구축
 터미널 환경을 넘어, 사용자가 웹 브라우저에서 편리하게 DB와 대화할 수 있는 간단한 GUI 애플리케이션을 만들어 봅니다.
@@ -957,32 +1111,43 @@ Northwind Data Assistant - Oracle Select AI Chatbot
 Simple, modular, and easy to read
 """
 
-import streamlit as st
 import os
+from dotenv import load_dotenv
+
+# ⚠️ 중요: TNS_ADMIN을 oracledb/select_ai 임포트 전에 설정해야 함!
+
+# .env 파일 로드
+load_dotenv()
+
+# 지갑 경로 설정 (압축 푼 폴더의 전체 경로)
+WALLET_DIR = os.getenv("WALLET_DIR")
+
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
+# 필수 환경 변수 체크
+if not WALLET_DIR:
+    raise ValueError("WALLET_DIR environment variable is not set. Please create a .env file with required variables.")
+if not DB_USER:
+    raise ValueError("DB_USER environment variable is not set.")
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is not set.")
+if not DB_DSN:
+    raise ValueError("DB_DSN environment variable is not set.")
+if not WALLET_PASSWORD:
+    raise ValueError("WALLET_PASSWORD environment variable is not set.")
+
+# TNS_ADMIN 설정 (oracledb 모듈이 로드되기 전에 반드시 설정)
+os.environ['TNS_ADMIN'] = WALLET_DIR
+print(f"✓ TNS_ADMIN 설정됨: {WALLET_DIR}")
+print(f"✓ DB_DSN: {DB_DSN}")
+
+# 이제 다른 모듈들을 import (TNS_ADMIN이 설정된 후)
+import streamlit as st
 import pandas as pd
 import oracledb
-
-# ============================================================================
-# CONFIGURATION - 환경 변수 또는 직접 설정
-# ============================================================================
-
-# 방법 1: 환경 변수 사용 (권장)
-WALLET_DIR = os.getenv("WALLET_DIR", "/path/to/your/wallet")
-DB_USER = os.getenv("DB_USER", "NORTHWIND")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "your_password")
-DB_DSN = os.getenv("DB_DSN", "your_service_name_low")
-WALLET_PASSWORD = os.getenv("WALLET_PASSWORD", "your_wallet_password")
-
-# 방법 2: 직접 설정 (보안에 주의)
-# WALLET_DIR = "/Users/yourname/wallet"
-# DB_USER = "NORTHWIND"
-# DB_PASSWORD = "your_actual_password"
-# DB_DSN = "your_adb_service_low"
-# WALLET_PASSWORD = "your_wallet_password"
-
-# Set TNS_ADMIN before importing select_ai
-os.environ['TNS_ADMIN'] = WALLET_DIR
-
 import select_ai
 
 # ============================================================================
@@ -992,7 +1157,6 @@ import select_ai
 def connect_to_database():
     """Connect to Oracle database"""
     try:
-        # Check if already connected
         if not select_ai.is_connected():
             select_ai.connect(
                 user=DB_USER,
@@ -1001,8 +1165,10 @@ def connect_to_database():
                 wallet_location=WALLET_DIR,
                 wallet_password=WALLET_PASSWORD
             )
+            print("✓ 데이터베이스 연결 성공!")
         return True, None
     except Exception as e:
+        print(f"❌ 연결 실패: {e}")
         return False, str(e)
 
 
@@ -1203,14 +1369,29 @@ def setup_sidebar():
         
         # AI Profile
         st.subheader("🎯 AI Profile")
-        profile = st.selectbox(
-            "Select Profile",
-            ["NORTHWIND_AI3", "NORTHWIND_AI"],
-            help="NORTHWIND_AI3 is recommended"
-        )
         
-        if profile == "NORTHWIND_AI":
-            st.warning("⚠️ NORTHWIND_AI may not work. Use NORTHWIND_AI3")
+        # Get available profiles from database
+        try:
+            profile_objects = select_ai.Profile.list()
+            if profile_objects:
+                # Extract profile names from profile objects
+                available_profiles = [p.profile_name for p in profile_objects]
+            else:
+                st.warning("⚠️ No profiles found in database")
+                available_profiles = ["NORTHWIND_AI"]  # fallback
+            
+            profile = st.selectbox(
+                "Select Profile",
+                available_profiles,
+                help="Select an AI profile configured in your database"
+            )
+        except Exception as e:
+            st.warning(f"⚠️ Could not fetch profiles: {e}")
+            profile = st.selectbox(
+                "Select Profile",
+                ["NORTHWIND_AI"],
+                help="Using default profile"
+            )
         
         # Query Mode
         st.subheader("💬 Mode")
@@ -1406,19 +1587,22 @@ Oracle Select AI MCP Server
 Simple interface to query Oracle database using natural language
 """
 
-from fastmcp import FastMCP
-import select_ai
 import os
+from dotenv import load_dotenv
 
 # ============================================================================
 # CONFIGURATION - 환경 변수 사용 (보안)
 # ============================================================================
+# .env 파일 로드
+load_dotenv()
 
 WALLET_DIR = os.getenv("WALLET_DIR")
+
 DB_USER = os.getenv("DB_USER", "NORTHWIND")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_DSN = os.getenv("DB_DSN")
 WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+
 DEFAULT_PROFILE = os.getenv("AI_PROFILE", "NORTHWIND_AI")
 
 # 필수 환경 변수 체크
@@ -1428,8 +1612,12 @@ if not all([WALLET_DIR, DB_PASSWORD, DB_DSN, WALLET_PASSWORD]):
         "WALLET_DIR, DB_PASSWORD, DB_DSN, WALLET_PASSWORD"
     )
 
-# Set TNS_ADMIN before any database operations
+# Set TNS_ADMIN before any database operations (MUST be before select_ai import)
 os.environ['TNS_ADMIN'] = WALLET_DIR
+
+# Now import select_ai and fastmcp AFTER setting TNS_ADMIN
+from fastmcp import FastMCP
+import select_ai
 
 # Create MCP server
 mcp = FastMCP("Oracle Select AI")
@@ -1446,13 +1634,14 @@ def ensure_connection():
                 user=DB_USER,
                 password=DB_PASSWORD,
                 dsn=DB_DSN,
-                config_dir=WALLET_DIR,
                 wallet_location=WALLET_DIR,
                 wallet_password=WALLET_PASSWORD
             )
         return True
     except Exception as e:
-        print(f"Connection error: {e}")
+        import sys, traceback
+        print(f"❌ Connection error: {e}", file=sys.stderr, flush=True)
+        print(f"Traceback: {traceback.format_exc()}", file=sys.stderr, flush=True)
         return False
 
 
@@ -1501,7 +1690,10 @@ def ask_database(
         return response
     
     except Exception as e:
-        return f"Error: {str(e)}"
+        import sys, traceback
+        error_msg = f"Error: {str(e)}"
+        print(f"❌ [ask_database] {error_msg}\n{traceback.format_exc()}", file=sys.stderr, flush=True)
+        return error_msg
 
 
 @mcp.tool()
@@ -1536,7 +1728,10 @@ def generate_sql(
         return str(sql)
     
     except Exception as e:
-        return f"Error: {str(e)}"
+        import sys, traceback
+        error_msg = f"Error: {str(e)}"
+        print(f"❌ [generate_sql] {error_msg}\n{traceback.format_exc()}", file=sys.stderr, flush=True)
+        return error_msg
 
 
 @mcp.tool()
@@ -1572,7 +1767,10 @@ def chat_with_ai(
         return response
     
     except Exception as e:
-        return f"Error: {str(e)}"
+        import sys, traceback
+        error_msg = f"Error: {str(e)}"
+        print(f"❌ [chat_with_ai] {error_msg}\n{traceback.format_exc()}", file=sys.stderr, flush=True)
+        return error_msg
 
 
 
@@ -1584,61 +1782,23 @@ def chat_with_ai(
 if __name__ == "__main__":
     # Start MCP server
     # This will be called by Cursor/Claude Desktop
-    print("Starting Oracle Select AI MCP Server...")
-    print(f"Connected to: {DB_DSN}")
-    print(f"Default profile: {DEFAULT_PROFILE}")
-    print(f"Available tools: ask_database, generate_sql, chat_with_ai")
+    import sys
+    print("="*80, file=sys.stderr, flush=True)
+    print("Starting Oracle Select AI MCP Server...", file=sys.stderr, flush=True)
+    print(f"✓ .env file loaded from: {os.getcwd()}", file=sys.stderr, flush=True)
+    print(f"✓ Wallet directory: {WALLET_DIR}", file=sys.stderr, flush=True)
+    print(f"✓ Database DSN: {DB_DSN}", file=sys.stderr, flush=True)
+    print(f"✓ Database user: {DB_USER}", file=sys.stderr, flush=True)
+    print(f"✓ Default AI profile: {DEFAULT_PROFILE}", file=sys.stderr, flush=True)
+    print(f"✓ Available tools: ask_database, generate_sql, chat_with_ai", file=sys.stderr, flush=True)
+    print("="*80, file=sys.stderr, flush=True)
     
     mcp.run()
+
 ```
 
 #### 4. 환경 변수 설정
 MCP 서버 실행 전에 필요한 환경 변수를 설정합니다.
-
-##### 4.1 환경 변수 설정 방법
-
-**방법 1: .env 파일 사용 (권장)**
-
-프로젝트 루트에 `.env` 파일 생성:
-```bash
-# .env
-WALLET_DIR=/path/to/your/Wallet_folder
-DB_USER=NORTHWIND
-DB_PASSWORD=your_password
-DB_DSN=your_service_name_low
-WALLET_PASSWORD=your_wallet_password
-AI_PROFILE=NORTHWIND_AI
-```
-
-그리고 `python-dotenv` 패키지 추가:
-```bash
-uv add python-dotenv
-```
-
-`mcp_server.py` 상단에 추가:
-```python
-from dotenv import load_dotenv
-load_dotenv()  # .env 파일 로드
-```
-
-**방법 2: 시스템 환경 변수 설정**
-
-MacOS/Linux (`~/.zshrc` 또는 `~/.bashrc`):
-```bash
-export WALLET_DIR="/path/to/your/wallet"
-export DB_USER="NORTHWIND"
-export DB_PASSWORD="your_password"
-export DB_DSN="your_service_name_low"
-export WALLET_PASSWORD="your_wallet_password"
-export AI_PROFILE="NORTHWIND_AI"
-```
-
-Windows (시스템 환경 변수 설정):
-```powershell
-setx WALLET_DIR "C:\path\to\your\wallet"
-setx DB_PASSWORD "your_password"
-# ... 나머지 변수도 동일하게 설정
-```
 
 #### 5. IDE 연동 설정
 구축한 MCP 서버를 IDE에 등록하여 AI 어시스턴트가 이 도구를 인식하고 사용할 수 있게 합니다.
@@ -1647,11 +1807,11 @@ setx DB_PASSWORD "your_password"
 Cursor는 설정 파일을 통해 MCP 서버를 등록합니다.
 
 **설정 파일 위치:**
-- MacOS: `~/Library/Application Support/Cursor/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-- Windows: `%APPDATA%\Cursor\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
-- Linux: `~/.config/Cursor/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+Mac: Cmd + , (커맨드 + 쉼표)
+Windows: Ctrl + ,
 
-**설정 파일 내용 (`cline_mcp_settings.json`):**
+**설정 파일 내용 (`cline_mcp_settings.json`):** 설정 화면에서 cline_mcp_settings.json 파일을 찾거나 생성합니다.
+Cmd + P → ~/.cursor/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json 입력
 
 ```json
 {
@@ -1660,18 +1820,10 @@ Cursor는 설정 파일을 통해 MCP 서버를 등록합니다.
       "command": "uv",
       "args": [
         "--directory",
-        "/absolute/path/to/your/oracle-select-ai-mcp",
+        "/Users/joungminko/devkit/fy26_ai_internal_training/1회차/adb_select_ai",
         "run",
         "mcp_server.py"
-      ],
-      "env": {
-        "WALLET_DIR": "/path/to/your/wallet",
-        "DB_USER": "NORTHWIND",
-        "DB_PASSWORD": "your_password",
-        "DB_DSN": "your_service_name_low",
-        "WALLET_PASSWORD": "your_wallet_password",
-        "AI_PROFILE": "NORTHWIND_AI"
-      }
+      ]
     }
   }
 }
@@ -1684,41 +1836,293 @@ Cursor는 설정 파일을 통해 MCP 서버를 등록합니다.
 
 **Cursor 재시작:**
 설정 파일을 저장한 후 Cursor를 완전히 종료하고 다시 시작합니다.
-#### 6. MCP 서버 사용 예시
 
-##### 6.1 로컬 테스트
+Cursor에서 MCP 서버 리로드 방법:
+커맨드 팔레트 열기 (Cmd+Shift+P)
+"MCP: Restart Servers" 또는 "Developer: Reload Window" 입력
+
+#### 6. MCP 서버 등록 및 통신 방식
+
+##### 6.1 MCP Tool 등록 방법
+
+MCP(Model Context Protocol) 서버를 Cursor에 등록하려면 설정 파일을 생성해야 합니다.
+
+**설정 파일 구조 설명:**
+- `mcpServers`: MCP 서버들의 컨테이너 객체
+- `oracle-select-ai`: 서버 식별자 (임의로 지정 가능)
+- `command`: 실행할 명령어 (uv, python, node 등)
+- `args`: 명령어에 전달할 인자 배열
+  - `--directory`: 프로젝트 디렉토리 (절대 경로)
+  - `run`: uv의 실행 명령
+  - `mcp_server.py`: 실행할 파일명
+
+**주의사항:**
+1. `--directory`는 **절대 경로**로 지정해야 합니다
+2. 해당 디렉토리에 `.env` 파일이 있어야 합니다 (환경 변수 로드용)
+3. `pyproject.toml`이 있는 디렉토리를 지정해야 합니다
+4. 설정 변경 후 Cursor를 재시작하거나 MCP 서버를 리로드해야 합니다
+
+**MCP 서버 리로드:**
+- `Cmd+Shift+P` (Mac) 또는 `Ctrl+Shift+P` (Windows)
+- "MCP: Restart Servers" 입력 및 실행
+
+##### 6.2 STDIO 통신 방식
+
+MCP는 **STDIO(Standard Input/Output)** 방식으로 통신합니다. 이는 프로세스 간 통신(IPC)의 가장 간단한 형태입니다.
+
+**통신 구조:**
+```
+┌─────────────┐         STDIN          ┌─────────────┐
+│             │  ─────────────────────> │             │
+│   Cursor    │    JSON-RPC 요청        │ MCP Server  │
+│    IDE      │                         │  (Python)   │
+│             │  <───────────────────── │             │
+└─────────────┘         STDOUT         └─────────────┘
+                      JSON-RPC 응답
+```
+
+**작동 원리:**
+
+1. **Cursor → MCP Server (STDIN):**
+   - Cursor가 JSON-RPC 형식의 요청을 MCP 서버의 **표준 입력(stdin)**으로 전송
+   - 예: `{"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "ask_database", "arguments": {"question": "..."}}}`
+
+2. **MCP Server → Cursor (STDOUT):**
+   - MCP 서버가 JSON-RPC 형식의 응답을 **표준 출력(stdout)**으로 반환
+   - 예: `{"jsonrpc": "2.0", "result": "재고가 가장 많은 제품은..."}`
+
+3. **에러 로그 (STDERR):**
+   - 디버깅 메시지나 에러는 **표준 에러(stderr)**로 출력
+   - stdout은 JSON-RPC 통신 전용으로 유지해야 함
+
+**중요한 규칙:**
+- ✅ **STDOUT**: JSON-RPC 메시지만 출력 (프로토콜 통신용)
+- ✅ **STDERR**: 디버그 로그, 에러 메시지 출력 (개발자용)
+- ❌ **STDOUT에 일반 텍스트 출력 금지**: JSON 파싱 오류 발생
+
+**올바른 로깅 예시:**
+```python
+import sys
+
+# ✅ 올바른 방법: stderr 사용
+print("Debug: Connecting to database...", file=sys.stderr, flush=True)
+
+# ❌ 잘못된 방법: stdout 사용 (JSON-RPC 깨짐)
+print("Debug: Connecting to database...")
+```
+
+##### 6.3 MCP 서버 코드 구조
+
+실제 작동하는 `mcp_server.py`의 핵심 구조입니다:
+
+```python
+"""
+Oracle Select AI MCP Server
+STDIO 방식으로 Cursor와 통신하는 MCP 서버
+"""
+
+import os
+from dotenv import load_dotenv
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
+
+# 환경 변수 설정
+WALLET_DIR = os.getenv("WALLET_DIR")
+DB_USER = os.getenv("DB_USER", "NORTHWIND")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_DSN = os.getenv("DB_DSN")
+WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
+DEFAULT_PROFILE = os.getenv("AI_PROFILE", "NORTHWIND_AI")
+
+# TNS_ADMIN 설정 (반드시 select_ai import 전에)
+os.environ['TNS_ADMIN'] = WALLET_DIR
+
+# FastMCP와 select_ai 임포트
+from fastmcp import FastMCP
+import select_ai
+
+# MCP 서버 생성
+mcp = FastMCP("Oracle Select AI")
+
+# 데이터베이스 연결 함수
+def ensure_connection():
+    """데이터베이스 연결 확인 및 재연결"""
+    try:
+        if not select_ai.is_connected():
+            select_ai.connect(
+                user=DB_USER,
+                password=DB_PASSWORD,
+                dsn=DB_DSN,
+                wallet_location=WALLET_DIR,
+                wallet_password=WALLET_PASSWORD
+            )
+        return True
+    except Exception as e:
+        import sys, traceback
+        # STDERR로 에러 로그 출력 (STDOUT 오염 방지)
+        print(f"❌ Connection error: {e}", file=sys.stderr, flush=True)
+        return False
+
+# MCP Tool 1: 데이터베이스 질의
+@mcp.tool()
+def ask_database(question: str, profile_name: str = DEFAULT_PROFILE) -> str:
+    """
+    자연어로 데이터베이스에 질문하고 결과를 받습니다.
+    
+    Args:
+        question: 자연어 질문 (예: "재고가 가장 많은 제품은?")
+        profile_name: AI 프로파일 이름 (기본값: NORTHWIND_AI)
+    
+    Returns:
+        자연어로 설명된 쿼리 결과
+    """
+    try:
+        if not ensure_connection():
+            return "Error: Could not connect to database"
+        
+        profile = select_ai.Profile(profile_name=profile_name)
+        response = profile.narrate(question)
+        return response
+    except Exception as e:
+        import sys, traceback
+        print(f"❌ [ask_database] {str(e)}", file=sys.stderr, flush=True)
+        return f"Error: {str(e)}"
+
+# MCP Tool 2: SQL 생성
+@mcp.tool()
+def generate_sql(question: str, profile_name: str = DEFAULT_PROFILE) -> str:
+    """
+    자연어를 SQL 쿼리로 변환합니다 (실행하지 않음).
+    
+    Args:
+        question: 자연어 질문
+        profile_name: AI 프로파일 이름
+    
+    Returns:
+        생성된 SQL 쿼리 문자열
+    """
+    try:
+        if not ensure_connection():
+            return "Error: Could not connect to database"
+        
+        profile = select_ai.Profile(profile_name=profile_name)
+        sql = profile.generate(f"showsql {question}")
+        return str(sql)
+    except Exception as e:
+        import sys
+        print(f"❌ [generate_sql] {str(e)}", file=sys.stderr, flush=True)
+        return f"Error: {str(e)}"
+
+# MCP Tool 3: AI 채팅
+@mcp.tool()
+def chat_with_ai(message: str, profile_name: str = DEFAULT_PROFILE) -> str:
+    """
+    데이터베이스에 대한 일반적인 질문에 답변합니다.
+    
+    Args:
+        message: 질문 메시지
+        profile_name: AI 프로파일 이름
+    
+    Returns:
+        AI의 답변
+    """
+    try:
+        if not ensure_connection():
+            return "Error: Could not connect to database"
+        
+        profile = select_ai.Profile(profile_name=profile_name)
+        response = profile.chat(message)
+        return response
+    except Exception as e:
+        import sys
+        print(f"❌ [chat_with_ai] {str(e)}", file=sys.stderr, flush=True)
+        return f"Error: {str(e)}"
+
+# 서버 시작
+if __name__ == "__main__":
+    import sys
+    # STDERR로 시작 로그 출력
+    print("="*80, file=sys.stderr, flush=True)
+    print("Starting Oracle Select AI MCP Server...", file=sys.stderr, flush=True)
+    print(f"✓ Database: {DB_DSN}", file=sys.stderr, flush=True)
+    print(f"✓ Profile: {DEFAULT_PROFILE}", file=sys.stderr, flush=True)
+    print("="*80, file=sys.stderr, flush=True)
+    
+    # STDIO 모드로 MCP 서버 실행
+    mcp.run()
+```
+
+**코드 설명:**
+
+1. **환경 변수 로드**: `.env` 파일에서 DB 접속 정보 로드
+2. **TNS_ADMIN 설정**: Oracle Wallet 경로 설정 (import 전에 필수)
+3. **MCP Tool 데코레이터**: `@mcp.tool()`로 함수를 MCP 도구로 등록
+4. **에러 처리**: 모든 에러는 stderr로 로깅, 사용자에게는 에러 메시지 반환
+5. **STDIO 통신**: `mcp.run()`이 stdin/stdout으로 JSON-RPC 통신 시작
+
+##### 6.4 로컬 테스트
+
 IDE 연동 전에 로컬에서 MCP 서버를 테스트할 수 있습니다:
 
 ```bash
-# 환경 변수 설정 후 실행
-cd /path/to/oracle-select-ai-mcp
+# 프로젝트 디렉토리로 이동
+cd /Users/joungminko/devkit/fy26_ai_internal_training/1회차/adb_select_ai
+
+# MCP 서버 실행
 uv run mcp_server.py
 ```
 
-##### 6.2 IDE 채팅창에서 사용
-
-**시나리오 1: 데이터 조회**
+**예상 출력 (STDERR):**
 ```
-User: 
+================================================================================
+Starting Oracle Select AI MCP Server...
+✓ Database: jtc0w11kmdnyykbj_low
+✓ Profile: NORTHWIND_AI
+================================================================================
+
+                        ▄▀▀ ▄▀█ █▀▀ ▀█▀ █▀▄▀█ █▀▀ █▀█
+                        █▀  █▀█ ▄▄█  █  █ ▀ █ █▄▄ █▀▀
+
+                             FastMCP 2.13.3
+
+                 🖥  Server name: Oracle Select AI
+                 📦 Transport:   STDIO
+```
+
+서버가 정상 실행되면 stdin에서 JSON-RPC 메시지를 대기합니다. `Ctrl+C`로 종료할 수 있습니다.
+
+##### 6.5 IDE 채팅창에서 사용
+
+**시나리오 1: 데이터 조회 (ask_database)**
+```
+사용자:
 "Northwind 데이터베이스에서 재고가 가장 많은 제품 5개를 알려줘"
 
-AI Assistant:
-(ask_database 도구 호출)
+AI (내부 동작):
+- MCP Tool 호출: ask_database("재고가 가장 많은 제품 5개")
+- DB 쿼리 실행 및 결과 반환
+
+AI 응답:
 "재고가 가장 많은 제품 5개는 다음과 같습니다:
+
 1. Grandma's Boysenberry Spread - 120개
-2. Uncle Bob's Organic Dried Pears - 15개
-3. Chai - 39개
-4. Chef Anton's Cajun Seasoning - 53개
+2. Organic Apples - 100개
+3. Chef Anton's Cajun Seasoning - 53개
+4. Chai - 39개
 5. Ikura - 31개"
 ```
 
-**시나리오 2: SQL 생성**
+**시나리오 2: SQL 생성 (generate_sql)**
 ```
-User:
+사용자:
 "1996년 7월에 주문한 고객들의 총 주문 금액을 계산하는 SQL을 만들어줘"
 
-AI Assistant:
-(generate_sql 도구 호출)
+AI (내부 동작):
+- MCP Tool 호출: generate_sql("1996년 7월 총 주문 금액")
+- SQL 생성 (실행하지 않음)
+
+AI 응답:
 "다음 SQL 쿼리를 사용하시면 됩니다:
 
 SELECT 
@@ -1734,13 +2138,16 @@ GROUP BY c.COMPANY_NAME
 ORDER BY TOTAL_AMOUNT DESC;"
 ```
 
-**시나리오 3: 데이터베이스 구조 질문**
+**시나리오 3: 데이터베이스 구조 질문 (chat_with_ai)**
 ```
-User:
+사용자:
 "Northwind 데이터베이스의 주요 테이블 구조를 설명해줘"
 
-AI Assistant:
-(chat_with_ai 도구 호출)
+AI (내부 동작):
+- MCP Tool 호출: chat_with_ai("주요 테이블 구조 설명")
+- LLM과 대화 (DB 조회 없음)
+
+AI 응답:
 "Northwind 데이터베이스는 다음 5개의 주요 테이블로 구성되어 있습니다:
 
 1. CATEGORIES: 제품 카테고리 정보 (음료, 조미료, 유제품 등)
@@ -1752,23 +2159,3 @@ AI Assistant:
 주문은 ORDERS와 ORDER_DETAILS로 분리되어 있으며,
 외래키로 연결되어 정규화된 구조를 갖추고 있습니다."
 ```
-
-##### 6.3 문제 해결 (Troubleshooting)
-
-**MCP 서버가 인식되지 않을 때:**
-1. Cursor를 완전히 종료하고 재시작
-2. 설정 파일 경로 확인 (`cline_mcp_settings.json`)
-3. `uv` 명령어 경로 확인: `which uv` 또는 `where.exe uv`
-4. 프로젝트 디렉토리 경로가 절대 경로인지 확인
-
-**연결 오류가 발생할 때:**
-1. 환경 변수가 올바르게 설정되었는지 확인
-2. Wallet 파일 경로가 정확한지 확인
-3. TNS_ADMIN 환경 변수 확인
-4. 데이터베이스 접속 정보(DSN, 비밀번호) 재확인
-
-**도구 호출이 실패할 때:**
-1. 로컬에서 직접 `uv run mcp_server.py` 실행하여 에러 메시지 확인
-2. AI 프로파일이 올바르게 생성되었는지 SQL Worksheet에서 확인
-3. 데이터베이스 권한 확인 (DBMS_CLOUD_AI 실행 권한)
-
