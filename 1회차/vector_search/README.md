@@ -1,1 +1,1 @@
-강의자료: kttp://thekoguryo.github.io/oracle-ai-ttt
+강의자료: [http://thekoguryo.github.io/oracle-ai-ttt](http://thekoguryo.github.io/oracle-ai-ttt)
