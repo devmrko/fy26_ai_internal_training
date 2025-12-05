@@ -371,20 +371,39 @@ COMMIT;
 
 **Case A-1: OCI GenAI (Resource Principal - 프로덕션 권장)**
 API Key 관리 없이 IAM 권한으로 인증하는 가장 안전한 방식입니다.
-  -  Dynamic Group 생성 (OCI 콘솔):
-      - 메뉴: Identity & Security > Dynamic Groups
-        - Create Dynamic Group 클릭.
-        - Name: ADB_Dynamic_Group
-        - Matching Rule: ADB 인스턴스가 속한 구획(Compartment)의 모든 DB를 포함하도록 설정. 
-        `ALL {resource.type = 'autonomousdatabase', resource.compartment.id = '<Your_Compartment_OCID>'}`
-  - Policy 설정 (OCI 콘솔):
-      - 메뉴: Identity & Security > Policies
-        - Create Policy 클릭.
-        - Name: Allow_ADB_Access_GenAI
-        - Statement: 위에서 만든 Dynamic Group이 GenAI 제품군을 사용할 수 있도록 허용.
-          `Allow dynamic-group ADB_Dynamic_Group to manage generative-ai-family in compartment <Your_Compartment_Name>`
 
-- Case A-2: OCI GenAI (API Key 방식 - Private Key 사용): 특정 OCI 사용자 계정의 API Key를 사용하여 인증합니다. 
+**1단계: Dynamic Group 생성 (OCI 콘솔)**
+  - 메뉴: Identity & Security > Dynamic Groups
+  - Create Dynamic Group 클릭
+  - Name: `ADB_Dynamic_Group`
+  - Matching Rule: ADB 인스턴스가 속한 구획(Compartment)의 모든 DB를 포함
+    ```
+    ALL {resource.type = 'autonomousdatabase', resource.compartment.id = '<Your_Compartment_OCID>'}
+    ```
+
+**2단계: Policy 설정 (OCI 콘솔)**
+  - 메뉴: Identity & Security > Policies
+  - Create Policy 클릭
+  - Name: `Allow_ADB_Access_GenAI`
+  - Statement: 위에서 만든 Dynamic Group이 GenAI 제품군을 사용할 수 있도록 허용
+    ```
+    Allow dynamic-group ADB_Dynamic_Group to manage generative-ai-family in compartment <Your_Compartment_Name>
+    ```
+
+**3단계: Resource Principal 사용**
+  - Resource Principal은 **별도의 credential 생성이 필요 없습니다**
+  - Oracle ADB는 `OCI$RESOURCE_PRINCIPAL`이라는 예약된 이름을 자동으로 인식합니다
+  - Dynamic Group과 Policy 설정만 완료하면 바로 사용 가능
+
+**주의사항:**
+- `OCI$RESOURCE_PRINCIPAL`은 Oracle이 예약한 특별한 이름 ($ 기호 포함)
+- DBMS_CLOUD.CREATE_CREDENTIAL로 생성하지 않음
+- OCI 리소스(ADB) 내부에서만 작동
+- Dynamic Group과 Policy가 올바르게 설정되어 있어야 함
+- 로컬 PC에서는 사용 불가 (API Key 방식 사용 필요)
+
+**Case A-2: OCI GenAI (API Key 방식 - Private Key 사용)**
+특정 OCI 사용자 계정의 API Key를 사용하여 인증합니다. 로컬 개발 환경에서 주로 사용됩니다. 
   - 준비:
     - OCI 콘솔 > 사용자 설정 > API Keys > Add API Key.
     - Private Key 다운로드 (.pem 파일).
@@ -448,12 +467,13 @@ COMMENT ON COLUMN PRODUCTS.UNITS_ON_ORDER IS '{"comment": "입고 예정 수량"
 COMMENT ON COLUMN PRODUCTS.UNIT_PRICE IS '{"comment": "단가", "annotation": {"currency": "USD", "description": "할인이 적용되지 않은 개별 상품의 기본 판매 가격"}}';
 ```
 
-###### 3.3 AI 프로파일 생성 (OCI GenAI 예시)
+###### 3.3 AI 프로파일 생성
+
 주의: 생성 시 object_list에 필요한 테이블을 지정하고, comments 속성을 true로 설정하면 위에서 작성한 annotation 주석이 LLM에 전달됩니다.
 
-```
+**프로파일 삭제 (선택사항)**
+```sql
 BEGIN
-    -- 1. 기존 프로파일이 있다면 삭제 (선택사항)
     DBMS_CLOUD_AI.DROP_PROFILE(
         profile_name => 'NORTHWIND_AI',
         force        => TRUE
@@ -462,9 +482,34 @@ END;
 /
 ```
 
-```
+**방법 1: Resource Principal 사용 (프로덕션 권장)**
+```sql
 BEGIN
-    -- 2. 새 프로파일 생성
+    DBMS_CLOUD_AI.CREATE_PROFILE(
+        profile_name => 'NORTHWIND_AI',
+        attributes   => '{
+            "provider": "oci",
+            "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+            "credential_name": "OCI$RESOURCE_PRINCIPAL",
+            "comments": false,
+            "object_list": [
+                {"owner": "NORTHWIND", "name": "CATEGORIES"},
+                {"owner": "NORTHWIND", "name": "PRODUCTS"},
+                {"owner": "NORTHWIND", "name": "CUSTOMERS"},
+                {"owner": "NORTHWIND", "name": "ORDERS"},
+                {"owner": "NORTHWIND", "name": "ORDER_DETAILS"}
+            ]
+        }'
+    );
+END;
+/
+```
+
+**참고:** `OCI$RESOURCE_PRINCIPAL`은 $ 기호가 포함된 Oracle의 예약 credential 이름입니다.
+
+**방법 2: API Key 사용**
+```sql
+BEGIN
     DBMS_CLOUD_AI.CREATE_PROFILE(
         profile_name => 'NORTHWIND_AI',
         attributes   => '{
@@ -485,23 +530,43 @@ END;
 /
 ```
 
-참고: 
+**주요 파라미터:**
 - `provider`: "oci" (OCI GenAI) 또는 "openai" (OpenAI) 선택
 - `model`: 사용할 모델 지정
+  - `meta.llama-4-maverick-17b-128e-instruct-fp8`: Llama 4 모델 (권장)
+  - `cohere.command-r-plus`: Cohere Command R+ 모델
+  - `meta.llama-3.1-405b-instruct`: Llama 3.1 405B 모델
+- `credential_name`: 인증 방식 지정
+  - `OCI$RESOURCE_PRINCIPAL`: Resource Principal 사용 (프로덕션) - **$ 기호 포함 주의**
+  - `OCI_KEY_CRED`: API Key 사용 (개발/테스트)
 - `comments`: true로 설정하면 테이블/컬럼 annotation 주석을 LLM에 전달
-- `credential_name`: 앞서 생성한 인증 정보 이름
+- `object_list`: Select AI가 접근할 수 있는 테이블 목록
 
-```
--- profile 확인
-SELECT *
-FROM   user_cloud_ai_profiles;
+**프로파일 확인:**
+```sql
+-- 생성된 프로파일 목록 확인
+SELECT profile_name, status, created_on
+FROM user_cloud_ai_profiles;
 
-SELECT attribute_name,
-       attribute_value
-FROM   user_cloud_ai_profile_attributes
-WHERE  profile_name = 'NORTHWIND_AI'
+-- 프로파일 상세 속성 확인
+SELECT attribute_name, attribute_value
+FROM user_cloud_ai_profile_attributes
+WHERE profile_name = 'NORTHWIND_AI'
 ORDER BY attribute_name;
 ```
+
+**예상 결과:**
+```
+ATTRIBUTE_NAME      ATTRIBUTE_VALUE
+------------------- --------------------------------------------------
+comments            false
+credential_name     OCI$RESOURCE_PRINCIPAL (또는 OCI_KEY_CRED)
+model               meta.llama-4-maverick-17b-128e-instruct-fp8
+object_list         [{"owner":"NORTHWIND","name":"CATEGORIES"}...]
+provider            oci
+```
+
+**중요:** Resource Principal 사용 시 credential_name에 **`OCI$RESOURCE_PRINCIPAL`** ($ 기호 포함)이 표시됩니다.
 
 ##### 4. 자연어 질의 테스트 (SQL Worksheet)
 
