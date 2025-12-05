@@ -400,7 +400,6 @@ API Key 관리 없이 IAM 권한으로 인증하는 가장 안전한 방식입�
 - DBMS_CLOUD.CREATE_CREDENTIAL로 생성하지 않음
 - OCI 리소스(ADB) 내부에서만 작동
 - Dynamic Group과 Policy가 올바르게 설정되어 있어야 함
-- 로컬 PC에서는 사용 불가 (API Key 방식 사용 필요)
 
 **Case A-2: OCI GenAI (API Key 방식 - Private Key 사용)**
 특정 OCI 사용자 계정의 API Key를 사용하여 인증합니다. 로컬 개발 환경에서 주로 사용됩니다. 
