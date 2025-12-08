@@ -1600,25 +1600,1564 @@ Select AI는 Oracle EBS 12.2와 통합되어 자연어 쿼리 기능을 제공�
 * [cite_start]**아키텍처:** APEX UI 프론트엔드를 통해 사용자의 질문을 받고, ADB의 Select AI가 이를 SQL로 변환한 뒤, EBS 데이터베이스(XX_NLQ 스키마)에서 쿼리를 실행합니다 [cite: 758-762].
 * [cite_start]**보안:** EBS의 보안 설정과 VPD(Virtual Private Database) 정책을 준수하여 쿼리가 실행됩니다[cite: 762].
 
-### 6.2 Apache Iceberg 테이블 쿼리
-[cite_start]Select AI는 데이터 레이크의 표준 포맷인 Apache Iceberg 테이블에 대한 쿼리를 지원합니다[cite: 2945].
-* **지원 모델:**
-    * [cite_start]**Catalog-Managed:** AWS Glue, Snowflake Polaris, Databricks Unity Catalog 등을 통해 메타데이터를 관리[cite: 3006].
-    * [cite_start]**Direct-Metadata:** `metadata.json` 파일을 직접 지정하여 쿼리 (스냅샷 방식)[cite: 3009].
-* [cite_start]**제약 사항:** 현재는 읽기 전용(Query-only)이며, 파티션된 테이블이나 Row-level update(Merge-on-Read)는 지원되지 않습니다 [cite: 2978-2979].
+### 6.2 MySQL Database 연결 핸즈온
+
+#### 6.2.1 MySQL 연결 개요
+
+**사용 사례:**
+- 레거시 애플리케이션이 MySQL에 데이터 저장
+- Oracle ADB로 마이그레이션 없이 자연어로 데이터 조회
+- MySQL과 ADB의 데이터를 연합 쿼리로 통합 분석
+
+#### 6.2.2 사전 준비: MySQL 서버 설정
+
+**MySQL 인스턴스 준비 (AWS RDS MySQL 예시)**
+
+```sql
+-- MySQL 서버에 접속하여 테스트 데이터베이스 생성
+CREATE DATABASE ecommerce;
+USE ecommerce;
+
+-- 제품 테이블 생성
+CREATE TABLE products (
+  product_id INT PRIMARY KEY AUTO_INCREMENT,
+  product_name VARCHAR(200),
+  category VARCHAR(100),
+  price DECIMAL(10,2),
+  stock_quantity INT,
+  supplier_id INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 주문 테이블 생성
+CREATE TABLE orders (
+  order_id INT PRIMARY KEY AUTO_INCREMENT,
+  customer_id INT,
+  order_date DATE,
+  total_amount DECIMAL(10,2),
+  status VARCHAR(50),
+  shipping_address TEXT
+);
+
+-- 주문 상세 테이블
+CREATE TABLE order_items (
+  item_id INT PRIMARY KEY AUTO_INCREMENT,
+  order_id INT,
+  product_id INT,
+  quantity INT,
+  unit_price DECIMAL(10,2),
+  FOREIGN KEY (order_id) REFERENCES orders(order_id),
+  FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+-- 샘플 데이터 입력
+INSERT INTO products (product_name, category, price, stock_quantity, supplier_id) VALUES
+('Laptop Pro 15', 'Electronics', 1299.99, 45, 101),
+('Wireless Mouse', 'Electronics', 29.99, 250, 101),
+('Office Chair', 'Furniture', 249.99, 30, 102),
+('Standing Desk', 'Furniture', 599.99, 15, 102),
+('USB-C Hub', 'Electronics', 49.99, 120, 103),
+('Monitor 27inch', 'Electronics', 399.99, 60, 101),
+('Desk Lamp LED', 'Furniture', 39.99, 80, 102),
+('Keyboard Mechanical', 'Electronics', 149.99, 95, 103);
+
+INSERT INTO orders (customer_id, order_date, total_amount, status) VALUES
+(1001, '2024-11-01', 1329.98, 'Delivered'),
+(1002, '2024-11-03', 649.98, 'Shipped'),
+(1003, '2024-11-05', 1899.97, 'Processing'),
+(1001, '2024-11-10', 79.98, 'Delivered'),
+(1004, '2024-11-15', 249.99, 'Pending');
+
+INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES
+(1, 1, 1, 1299.99),
+(1, 2, 1, 29.99),
+(2, 4, 1, 599.99),
+(2, 3, 1, 49.99),
+(3, 1, 1, 1299.99),
+(3, 6, 1, 399.99),
+(3, 8, 1, 149.99);
+
+-- 원격 접속을 위한 사용자 생성
+CREATE USER 'adb_user'@'%' IDENTIFIED BY 'SecurePassword123!';
+GRANT SELECT ON ecommerce.* TO 'adb_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+**MySQL 보안 그룹 설정 (AWS 예시)**
+- Inbound Rules에 ADB의 Public IP 추가
+- Port: 3306
+- Source: ADB NAT Gateway IP 또는 0.0.0.0/0 (테스트용)
+
+#### 6.2.3 ADB에서 MySQL 연결 설정
+
+**Step 1: MySQL JDBC Driver 확인**
+
+Oracle Autonomous Database는 MySQL JDBC 드라이버를 내장하고 있습니다. 별도 설치 불필요.
+
+**Step 2: MySQL 연결 Credential 생성**
+
+```sql
+-- MySQL 접속 정보를 저장하는 Credential 생성
+BEGIN
+  DBMS_CLOUD.CREATE_CREDENTIAL(
+    credential_name => 'MYSQL_CRED',
+    username => 'adb_user',
+    password => 'SecurePassword123!'
+  );
+END;
+/
+
+-- Credential 확인
+SELECT credential_name, username, enabled
+FROM USER_CREDENTIALS
+WHERE credential_name = 'MYSQL_CRED';
+```
+
+**Step 3: Database Link 생성**
+
+```sql
+-- MySQL 데이터베이스로의 Database Link 생성
+BEGIN
+  DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
+    db_link_name => 'MYSQL_ECOMMERCE_LINK',
+    hostname => 'mysql-instance.c9akciq32.us-east-1.rds.amazonaws.com',
+    port => '3306',
+    service_name => 'ecommerce',
+    ssl_server_cert_dn => NULL,
+    credential_name => 'MYSQL_CRED',
+    directory_name => NULL
+  );
+END;
+/
+
+-- Database Link 확인
+SELECT db_link, host, username, created
+FROM USER_DB_LINKS
+WHERE db_link = 'MYSQL_ECOMMERCE_LINK';
+```
+
+**Step 4: 연결 테스트**
+
+```sql
+-- MySQL 테이블 조회 테스트
+SELECT * 
+FROM products@MYSQL_ECOMMERCE_LINK
+WHERE ROWNUM <= 5;
+
+-- 카운트 확인
+SELECT COUNT(*) as total_products
+FROM products@MYSQL_ECOMMERCE_LINK;
+
+SELECT COUNT(*) as total_orders
+FROM orders@MYSQL_ECOMMERCE_LINK;
+```
+
+#### 6.2.4 Select AI 프로파일 생성 (MySQL 포함)
+
+**ADB의 로컬 테이블 준비**
+
+```sql
+-- ADB에 고객 정보 테이블 생성 (Oracle에 저장)
+CREATE TABLE customers (
+  customer_id NUMBER PRIMARY KEY,
+  first_name VARCHAR2(50),
+  last_name VARCHAR2(50),
+  email VARCHAR2(100),
+  phone VARCHAR2(20),
+  customer_segment VARCHAR2(20),
+  registration_date DATE
+);
+
+-- 샘플 고객 데이터
+INSERT INTO customers VALUES (1001, 'John', 'Doe', 'john.doe@email.com', '555-0101', 'Premium', DATE '2023-05-15');
+INSERT INTO customers VALUES (1002, 'Jane', 'Smith', 'jane.smith@email.com', '555-0102', 'Standard', DATE '2023-08-20');
+INSERT INTO customers VALUES (1003, 'Robert', 'Johnson', 'robert.j@email.com', '555-0103', 'Premium', DATE '2023-03-10');
+INSERT INTO customers VALUES (1004, 'Emily', 'Williams', 'emily.w@email.com', '555-0104', 'Standard', DATE '2024-01-05');
+COMMIT;
+```
+
+**MySQL 테이블을 포함한 AI 프로파일 생성**
+
+```sql
+BEGIN
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'MYSQL_FEDERATED_PROFILE',
+    attributes => JSON_OBJECT(
+      'provider' VALUE 'oci',
+      'credential_name' VALUE 'OCI_CRED',
+      'model' VALUE 'cohere.command-r-plus',
+      'comments' VALUE 'true',
+      
+      -- 오라클 로컬 테이블과 MySQL 원격 테이블 모두 포함
+      'object_list' VALUE JSON_ARRAY(
+        -- ADB 로컬 테이블
+        JSON_OBJECT(
+          'owner' VALUE 'ADMIN',
+          'name' VALUE 'CUSTOMERS'
+        ),
+        -- MySQL 원격 테이블들 (Database Link 사용)
+        JSON_OBJECT(
+          'owner' VALUE 'ADMIN',
+          'name' VALUE 'PRODUCTS@MYSQL_ECOMMERCE_LINK'
+        ),
+        JSON_OBJECT(
+          'owner' VALUE 'ADMIN',
+          'name' VALUE 'ORDERS@MYSQL_ECOMMERCE_LINK'
+        ),
+        JSON_OBJECT(
+          'owner' VALUE 'ADMIN',
+          'name' VALUE 'ORDER_ITEMS@MYSQL_ECOMMERCE_LINK'
+        )
+      )
+    )
+  );
+  
+  -- 프로파일 활성화
+  DBMS_CLOUD_AI.SET_PROFILE('MYSQL_FEDERATED_PROFILE');
+END;
+/
+```
+
+**테이블 주석 추가 (정확도 향상)**
+
+```sql
+-- ADB 로컬 테이블 주석
+COMMENT ON TABLE customers IS 
+'Customer master data including contact information and segmentation';
+
+COMMENT ON COLUMN customers.customer_segment IS 
+'Customer tier: Premium (high-value), Standard (regular), or Trial';
+
+-- MySQL 테이블은 MySQL에서 주석 추가
+-- (또는 ADB에서 Synonym 생성 후 주석 추가 가능)
+```
+
+#### 6.2.5 연합 쿼리 실습
+
+**질문 1: MySQL 테이블만 조회**
+
+```sql
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '재고가 50개 미만인 제품과 재고 수량을 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 예상 생성 SQL:
+-- SELECT product_name, stock_quantity
+-- FROM products@MYSQL_ECOMMERCE_LINK
+-- WHERE stock_quantity < 50
+-- ORDER BY stock_quantity;
+```
+
+**질문 2: Oracle + MySQL 연합 쿼리**
+
+```sql
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => 'Premium 고객들의 총 주문 금액과 주문 건수를 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 예상 생성 SQL (Oracle + MySQL 조인):
+-- SELECT 
+--   c.first_name || ' ' || c.last_name as customer_name,
+--   c.customer_segment,
+--   COUNT(o.order_id) as order_count,
+--   SUM(o.total_amount) as total_spent
+-- FROM customers c
+-- JOIN orders@MYSQL_ECOMMERCE_LINK o ON c.customer_id = o.customer_id
+-- WHERE c.customer_segment = 'Premium'
+-- GROUP BY c.first_name, c.last_name, c.customer_segment
+-- ORDER BY total_spent DESC;
+```
+
+**질문 3: 복잡한 3-Way 조인**
+
+```sql
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => 'John Doe 고객이 구매한 제품 목록과 각 제품의 수량을 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 예상 생성 SQL:
+-- SELECT 
+--   p.product_name,
+--   p.category,
+--   oi.quantity,
+--   oi.unit_price,
+--   o.order_date
+-- FROM customers c
+-- JOIN orders@MYSQL_ECOMMERCE_LINK o ON c.customer_id = o.customer_id
+-- JOIN order_items@MYSQL_ECOMMERCE_LINK oi ON o.order_id = oi.order_id
+-- JOIN products@MYSQL_ECOMMERCE_LINK p ON oi.product_id = p.product_id
+-- WHERE c.first_name = 'John' AND c.last_name = 'Doe'
+-- ORDER BY o.order_date DESC;
+```
+
+**질문 4: 집계 및 분석**
+
+```sql
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '카테고리별 매출 상위 3개와 각 카테고리의 총 판매액을 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 대화형으로 이어서 질문
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '그 중에서 Premium 고객의 구매만 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+```
+
+#### 6.2.6 성능 최적화
+
+**원격 테이블 캐싱**
+
+```sql
+-- 자주 조회되는 MySQL 테이블을 ADB에 캐시
+CREATE MATERIALIZED VIEW products_cache
+BUILD IMMEDIATE
+REFRESH COMPLETE ON DEMAND
+AS
+SELECT * FROM products@MYSQL_ECOMMERCE_LINK;
+
+-- 캐시된 뷰를 프로파일에 추가
+BEGIN
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'MYSQL_OPTIMIZED_PROFILE',
+    attributes => JSON_OBJECT(
+      'provider' VALUE 'oci',
+      'credential_name' VALUE 'OCI_CRED',
+      'object_list' VALUE JSON_ARRAY(
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'CUSTOMERS'),
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'PRODUCTS_CACHE'),
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'ORDERS@MYSQL_ECOMMERCE_LINK')
+      )
+    )
+  );
+END;
+/
+
+-- 정기적으로 캐시 갱신
+BEGIN
+  DBMS_MVIEW.REFRESH('PRODUCTS_CACHE');
+END;
+/
+```
+
+**쿼리 힌트 활용**
+
+```sql
+-- 대량 조인 시 드라이빙 테이블 지정
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '모든 주문 내역을 고객 정보와 함께 보여줘',
+  action => 'showsql'
+) FROM DUAL;
+
+-- 생성된 SQL에 힌트 추가 (필요시)
+SELECT /*+ USE_HASH(c o) LEADING(c) */ 
+  c.customer_id,
+  c.first_name,
+  o.order_id,
+  o.total_amount
+FROM customers c
+JOIN orders@MYSQL_ECOMMERCE_LINK o ON c.customer_id = o.customer_id;
+```
+
+### 6.3 Apache Iceberg 테이블 쿼리 핸즈온
+
+#### 6.3.1 Iceberg 개요
+
+[cite: 2945] Select AI는 데이터 레이크의 표준 포맷인 Apache Iceberg 테이블에 대한 쿼리를 지원합니다.
+
+**Iceberg의 장점:**
+- 대규모 데이터 레이크에서 ACID 트랜잭션 지원
+- 스키마 진화 (Schema Evolution)
+- 파티션 진화 (Partition Evolution)
+- 타임 트래블 (Time Travel) 쿼리
+- AWS S3, Azure ADLS, GCS 등 다양한 스토리지 지원
+
+#### 6.3.2 Iceberg 지원 모델
+
+[cite: 3006, 3009] Select AI는 두 가지 방식으로 Iceberg 테이블을 지원합니다:
+
+| 방식 | 설명 | 장점 | 단점 |
+|------|------|------|------|
+| **Catalog-Managed** | AWS Glue, Polaris, Unity Catalog 사용 | 메타데이터 자동 관리, 실시간 스키마 업데이트 | Catalog 서비스 필요 |
+| **Direct-Metadata** | metadata.json 파일 직접 참조 | Catalog 불필요, 간단한 설정 | 스냅샷 시점 고정, 수동 업데이트 |
+
+[cite: 2978-2979] **제약 사항:** 
+- 현재는 읽기 전용(Query-only)
+- 파티션된 테이블 미지원
+- Row-level update(Merge-on-Read) 미지원
+
+#### 6.3.3 방법 1: AWS Glue Catalog를 사용한 Iceberg 연결
+
+**사전 준비: AWS Glue에 Iceberg 테이블 생성**
+
+```python
+# AWS Glue 또는 Spark에서 Iceberg 테이블 생성 (예시)
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder \
+    .appName("Create Iceberg Table") \
+    .config("spark.sql.catalog.glue_catalog", "org.apache.iceberg.spark.SparkCatalog") \
+    .config("spark.sql.catalog.glue_catalog.warehouse", "s3://my-data-lake/warehouse/") \
+    .config("spark.sql.catalog.glue_catalog.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog") \
+    .getOrCreate()
+
+# 웹 애플리케이스 로그 데이터
+df = spark.read.parquet("s3://source-data/web-logs/")
+
+df.writeTo("glue_catalog.analytics.web_events") \
+    .using("iceberg") \
+    .partitionedBy("event_date") \
+    .create()
+```
+
+**Step 1: AWS Glue 접근을 위한 Credential 생성**
+
+```sql
+-- AWS Access Key 방식
+BEGIN
+  DBMS_CLOUD.CREATE_CREDENTIAL(
+    credential_name => 'AWS_GLUE_CRED',
+    username => 'AKIAIOSFODNN7EXAMPLE',  -- AWS Access Key ID
+    password => 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'  -- AWS Secret Key
+  );
+END;
+/
+
+-- 또는 IAM Role 사용 (권장)
+BEGIN
+  DBMS_CLOUD.CREATE_CREDENTIAL(
+    credential_name => 'AWS_GLUE_CRED',
+    username => 'OCI$RESOURCE_PRINCIPAL'
+  );
+END;
+/
+```
+
+**Step 2: Iceberg External Table 생성 (Glue Catalog 방식)**
+
+```sql
+-- AWS Glue Catalog의 Iceberg 테이블을 ADB에 External Table로 매핑
+BEGIN
+  DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+    table_name => 'WEB_EVENTS_ICEBERG',
+    credential_name => 'AWS_GLUE_CRED',
+    format => JSON_OBJECT(
+      'type' VALUE 'iceberg',
+      'catalog_type' VALUE 'glue',
+      'catalog_name' VALUE 'glue_catalog',
+      'catalog_database' VALUE 'analytics',
+      'catalog_table' VALUE 'web_events',
+      'region' VALUE 'us-east-1'
+    ),
+    column_list => 'event_id NUMBER,
+                    user_id NUMBER,
+                    event_type VARCHAR2(50),
+                    page_url VARCHAR2(500),
+                    event_timestamp TIMESTAMP,
+                    session_id VARCHAR2(100),
+                    device_type VARCHAR2(50),
+                    event_date DATE'
+  );
+END;
+/
+```
+
+**Step 3: Iceberg 테이블 쿼리 테스트**
+
+```sql
+-- 직접 SQL로 조회
+SELECT event_type, COUNT(*) as event_count
+FROM WEB_EVENTS_ICEBERG
+WHERE event_date >= DATE '2024-11-01'
+GROUP BY event_type
+ORDER BY event_count DESC;
+
+-- 특정 사용자의 행동 추적
+SELECT 
+  event_timestamp,
+  event_type,
+  page_url,
+  device_type
+FROM WEB_EVENTS_ICEBERG
+WHERE user_id = 12345
+ORDER BY event_timestamp;
+```
+
+#### 6.3.4 방법 2: Direct Metadata를 사용한 Iceberg 연결
+
+**Step 1: Iceberg 메타데이터 파일 위치 확인**
+
+Iceberg 테이블의 메타데이터는 다음 경로에 저장됩니다:
+```
+s3://my-data-lake/warehouse/analytics/web_events/metadata/
+  ├── v1.metadata.json
+  ├── v2.metadata.json
+  └── v3.metadata.json  ← 최신 버전
+```
+
+**Step 2: Direct Metadata 방식으로 External Table 생성**
+
+```sql
+BEGIN
+  DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+    table_name => 'WEB_EVENTS_SNAPSHOT',
+    credential_name => 'AWS_GLUE_CRED',
+    format => JSON_OBJECT(
+      'type' VALUE 'iceberg',
+      'metadata_location' VALUE 's3://my-data-lake/warehouse/analytics/web_events/metadata/v3.metadata.json'
+    ),
+    column_list => 'event_id NUMBER,
+                    user_id NUMBER,
+                    event_type VARCHAR2(50),
+                    page_url VARCHAR2(500),
+                    event_timestamp TIMESTAMP,
+                    session_id VARCHAR2(100),
+                    device_type VARCHAR2(50),
+                    event_date DATE'
+  );
+END;
+/
+```
+
+**Step 3: Time Travel 쿼리 (특정 스냅샷 조회)**
+
+```sql
+-- 이전 스냅샷 조회 (v2.metadata.json)
+BEGIN
+  DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+    table_name => 'WEB_EVENTS_YESTERDAY',
+    credential_name => 'AWS_GLUE_CRED',
+    format => JSON_OBJECT(
+      'type' VALUE 'iceberg',
+      'metadata_location' VALUE 's3://my-data-lake/warehouse/analytics/web_events/metadata/v2.metadata.json'
+    ),
+    column_list => '...'
+  );
+END;
+/
+
+-- 두 스냅샷 비교
+SELECT 'Current' as snapshot, COUNT(*) as row_count FROM WEB_EVENTS_SNAPSHOT
+UNION ALL
+SELECT 'Yesterday' as snapshot, COUNT(*) as row_count FROM WEB_EVENTS_YESTERDAY;
+```
+
+#### 6.3.5 Select AI with Iceberg
+
+**Iceberg 테이블을 포함한 프로파일 생성**
+
+```sql
+BEGIN
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'ICEBERG_ANALYTICS_PROFILE',
+    attributes => JSON_OBJECT(
+      'provider' VALUE 'oci',
+      'credential_name' VALUE 'OCI_CRED',
+      'model' VALUE 'cohere.command-r-plus',
+      'comments' VALUE 'true',
+      
+      'object_list' VALUE JSON_ARRAY(
+        -- ADB 로컬 테이블
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'CUSTOMERS'),
+        -- MySQL 테이블
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'ORDERS@MYSQL_ECOMMERCE_LINK'),
+        -- Iceberg 테이블
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'WEB_EVENTS_ICEBERG')
+      )
+    )
+  );
+  
+  DBMS_CLOUD_AI.SET_PROFILE('ICEBERG_ANALYTICS_PROFILE');
+END;
+/
+```
+
+**테이블 주석 추가**
+
+```sql
+COMMENT ON TABLE WEB_EVENTS_ICEBERG IS 
+'Web application user behavior events stored in Iceberg format in S3 data lake';
+
+COMMENT ON COLUMN WEB_EVENTS_ICEBERG.event_type IS 
+'Type of event: page_view, click, form_submit, purchase, logout';
+
+COMMENT ON COLUMN WEB_EVENTS_ICEBERG.device_type IS 
+'Device category: desktop, mobile, tablet';
+```
+
+#### 6.3.6 3-Way 연합 쿼리: Oracle + MySQL + Iceberg
+
+**시나리오: 고객의 웹 행동과 구매 패턴 분석**
+
+```sql
+-- 질문 1: 웹사이트 방문 후 실제 구매한 고객 비율
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '지난 7일간 웹사이트를 방문한 고객 중 실제로 구매한 고객의 비율은?',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 예상 생성 SQL:
+-- WITH visitors AS (
+--   SELECT DISTINCT user_id as customer_id
+--   FROM WEB_EVENTS_ICEBERG
+--   WHERE event_date >= SYSDATE - 7
+-- ),
+-- purchasers AS (
+--   SELECT DISTINCT customer_id
+--   FROM orders@MYSQL_ECOMMERCE_LINK
+--   WHERE order_date >= SYSDATE - 7
+-- )
+-- SELECT 
+--   COUNT(DISTINCT v.customer_id) as total_visitors,
+--   COUNT(DISTINCT p.customer_id) as purchasers,
+--   ROUND(COUNT(DISTINCT p.customer_id) * 100.0 / COUNT(DISTINCT v.customer_id), 2) as conversion_rate
+-- FROM visitors v
+-- LEFT JOIN purchasers p ON v.customer_id = p.customer_id;
+```
+
+**질문 2: 고객 세그먼트별 웹 행동 분석**
+
+```sql
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => 'Premium 고객과 Standard 고객의 평균 페이지 뷰 수를 비교해줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 예상 생성 SQL:
+-- SELECT 
+--   c.customer_segment,
+--   COUNT(w.event_id) as total_page_views,
+--   COUNT(DISTINCT w.session_id) as total_sessions,
+--   ROUND(COUNT(w.event_id) * 1.0 / COUNT(DISTINCT w.session_id), 2) as avg_pages_per_session
+-- FROM customers c
+-- JOIN WEB_EVENTS_ICEBERG w ON c.customer_id = w.user_id
+-- WHERE w.event_type = 'page_view'
+--   AND w.event_date >= SYSDATE - 30
+-- GROUP BY c.customer_segment;
+```
+
+**질문 3: 제품 조회 후 구매 전환율**
+
+```sql
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '제품 페이지를 본 고객 중 해당 제품을 실제로 구매한 비율을 제품별로 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 복잡한 3-Way 조인:
+-- Oracle CUSTOMERS + Iceberg WEB_EVENTS + MySQL ORDERS/ORDER_ITEMS
+```
+
+**질문 4: 실시간 대시보드 쿼리**
+
+```sql
+-- 대화형 질문
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '현재 온라인 상태인 고객 수는? (최근 10분 이내 활동)',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 이어서 질문
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '그 중에서 장바구니에 상품을 담은 고객은 몇 명이야?',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 계속 질문
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '장바구니 총액 상위 5명의 고객 정보를 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+```
+
+#### 6.3.7 Iceberg 테이블 관리
+
+**메타데이터 새로고침 (Direct Metadata 방식)**
+
+```sql
+-- 새로운 스냅샷이 생성되면 External Table 재생성
+BEGIN
+  DBMS_CLOUD.DROP_EXTERNAL_TABLE(
+    table_name => 'WEB_EVENTS_ICEBERG'
+  );
+  
+  DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+    table_name => 'WEB_EVENTS_ICEBERG',
+    credential_name => 'AWS_GLUE_CRED',
+    format => JSON_OBJECT(
+      'type' VALUE 'iceberg',
+      'metadata_location' VALUE 's3://my-data-lake/warehouse/analytics/web_events/metadata/v4.metadata.json'  -- 새 버전
+    ),
+    column_list => '...'
+  );
+END;
+/
+```
+
+**Catalog-Managed 방식은 자동 업데이트**
+
+```sql
+-- Glue Catalog 방식은 항상 최신 스냅샷 참조
+-- 별도 새로고침 불필요
+SELECT COUNT(*) FROM WEB_EVENTS_ICEBERG;  -- 항상 최신 데이터
+```
+
+**스키마 확인**
+
+```sql
+-- Iceberg 테이블 스키마 확인
+SELECT column_name, data_type, data_length
+FROM USER_TAB_COLUMNS
+WHERE table_name = 'WEB_EVENTS_ICEBERG'
+ORDER BY column_id;
+```
+
+### 6.4 통합 시나리오: 전사 데이터 분석
+
+#### 실전 비즈니스 쿼리
+
+**시나리오:** 전자상거래 기업의 CMO가 마케팅 캠페인 효과를 분석
+
+```sql
+-- CMO: "지난 달 신규 가입 고객들의 첫 구매까지 걸린 평균 시간과 
+--       첫 구매 금액을 고객 유입 채널별로 보여줘"
+
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '지난 달 신규 가입 고객들의 첫 구매까지 걸린 평균 시간과 첫 구매 금액을 고객 유입 채널별로 보여줘',
+  profile_name => 'ICEBERG_ANALYTICS_PROFILE',
+  action => 'runsql'
+) FROM DUAL;
+
+-- Select AI가 생성하는 복잡한 쿼리:
+-- 1. CUSTOMERS (Oracle) - 신규 가입 고객 필터링
+-- 2. WEB_EVENTS_ICEBERG - 유입 채널 정보 추출
+-- 3. ORDERS@MYSQL_ECOMMERCE_LINK - 첫 구매 정보
+-- 위 3개 데이터 소스를 조인하여 분석
+```
+
+**연속 질문으로 드릴다운**
+
+```sql
+-- 후속 질문 1
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '가장 전환율이 높은 채널의 상위 10개 제품은 뭐야?',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 후속 질문 2
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '해당 제품들의 현재 재고 상황은?',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 후속 질문 3
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '재고가 부족한 제품이 있으면 공급업체 정보도 같이 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+```
+
+### 6.5 모니터링 및 문제 해결
+
+#### Database Link 상태 확인
+
+```sql
+-- 활성 Database Link 조회
+SELECT 
+  db_link,
+  host,
+  username,
+  created
+FROM USER_DB_LINKS;
+
+-- Database Link 연결 테스트
+SELECT 
+  'MySQL Connection' as test_name,
+  CASE 
+    WHEN COUNT(*) > 0 THEN 'Success'
+    ELSE 'Failed'
+  END as status
+FROM products@MYSQL_ECOMMERCE_LINK
+WHERE ROWNUM <= 1;
+```
+
+#### External Table (Iceberg) 상태 확인
+
+```sql
+-- External Table 정보
+SELECT 
+  table_name,
+  type_name,
+  default_directory_name,
+  access_parameters
+FROM USER_EXTERNAL_TABLES
+WHERE table_name LIKE '%ICEBERG%';
+
+-- Iceberg 테이블 읽기 테스트
+SELECT COUNT(*) FROM WEB_EVENTS_ICEBERG WHERE ROWNUM <= 10;
+```
+
+#### 성능 모니터링
+
+```sql
+-- 원격 쿼리 실행 통계
+SELECT 
+  sql_text,
+  executions,
+  avg_elapsed_time / 1000000 as avg_seconds,
+  buffer_gets,
+  disk_reads
+FROM V$SQL
+WHERE sql_text LIKE '%@MYSQL_ECOMMERCE_LINK%'
+ORDER BY avg_elapsed_time DESC;
+```
 
 ---
 
-## 7. DBMS_CLOUD_AI 패키지 핵심 레퍼런스
+## 7. 핸즈온 실습 가이드
 
-[cite_start]Select AI 기능을 제어하는 주요 서브프로그램 요약입니다 [cite: 1973-1977].
+### 7.1 실습 1: 기본 Proxy Database 설정
 
-| 서브프로그램 | 설명 |
-| :--- | :--- |
-| **CREATE_PROFILE** | [cite_start]LLM 제공자, 모델, 대상 테이블 등을 지정하여 AI 프로파일 생성[cite: 1980]. |
-| **SET_PROFILE** | [cite_start]현재 세션에서 사용할 AI 프로파일 활성화[cite: 2015]. |
-| **GENERATE** | AI에게 작업을 요청하는 핵심 함수. [cite_start]`runsql`, `showsql`, `narrate`, `chat`, `summarize` 등의 액션 수행[cite: 2011]. |
-| **CREATE_VECTOR_INDEX** | [cite_start]비정형 데이터를 벡터화하여 인덱스 생성 (RAG용)[cite: 2059]. |
-| **FEEDBACK** | [cite_start]AI가 생성한 쿼리에 대해 긍정/부정 피드백을 제공하여 정확도 개선[cite: 2000]. |
-| **GENERATE_SYNTHETIC_DATA** | [cite_start]개발/테스트용 가상 데이터를 생성[cite: 2049]. |
-| **SUMMARIZE** | [cite_start]긴 텍스트 내용을 요약 (문단 또는 리스트 형태)[cite: 2043]. |
+**목표:** MySQL 데이터베이스를 ADB에 연결하고 Select AI로 자연어 쿼리
+
+**소요 시간:** 30분
+
+**단계:**
+1. ✅ MySQL RDS 인스턴스 생성 및 샘플 데이터 로드
+2. ✅ ADB에서 Database Link 생성
+3. ✅ Select AI 프로파일 설정
+4. ✅ 자연어 쿼리 테스트
+
+**체크리스트:**
+- [ ] MySQL 테이블 직접 조회 성공
+- [ ] Database Link 연결 확인
+- [ ] Select AI 프로파일 생성 완료
+- [ ] 자연어 질문으로 데이터 조회 성공
+
+### 7.2 실습 2: Iceberg 데이터 레이크 연결
+
+**목표:** S3의 Iceberg 테이블을 ADB에서 쿼리
+
+**소요 시간:** 45분
+
+**단계:**
+1. ✅ AWS Glue에 Iceberg 테이블 생성 (또는 기존 테이블 사용)
+2. ✅ ADB에서 External Table 생성
+3. ✅ Iceberg 테이블 쿼리 테스트
+4. ✅ Select AI 프로파일에 Iceberg 테이블 추가
+
+**체크리스트:**
+- [ ] AWS Glue Catalog 접근 성공
+- [ ] Iceberg 메타데이터 읽기 성공
+- [ ] External Table 쿼리 작동
+- [ ] Select AI로 Iceberg 데이터 조회 가능
+
+### 7.3 실습 3: 연합 쿼리 마스터
+
+**목표:** Oracle + MySQL + Iceberg 3-Way 조인 쿼리 실행
+
+**소요 시간:** 60분
+
+**단계:**
+1. ✅ 세 데이터 소스 모두 프로파일에 등록
+2. ✅ 각 테이블에 의미있는 주석 추가
+3. ✅ 단순 조인 쿼리 테스트
+4. ✅ 복잡한 비즈니스 쿼리 실행
+5. ✅ 대화형 질문으로 드릴다운 분석
+
+**체크리스트:**
+- [ ] 3개 데이터 소스 동시 조회 성공
+- [ ] 조인 쿼리 자동 생성 확인
+- [ ] 집계 및 그룹화 쿼리 작동
+- [ ] 대화 문맥 유지되며 연속 질문 가능
+
+### 7.4 실습 4: 성능 최적화
+
+**목표:** 대규모 데이터 조회 시 응답 속도 개선
+
+**소요 시간:** 30분
+
+**기법:**
+- Materialized View로 원격 테이블 캐싱
+- 쿼리 힌트 활용
+- 인덱스 전략
+- 파티션 활용
+
+**체크리스트:**
+- [ ] 캐시 적용 전후 성능 비교
+- [ ] 실행 계획 분석 완료
+- [ ] 최적화된 프로파일 생성
+
+---
+
+## 8. DBMS_CLOUD_AI 패키지 핵심 레퍼런스
+
+[cite: 1973-1977] Select AI 기능을 제어하는 주요 서브프로그램 요약입니다.
+
+### 8.1 주요 서브프로그램
+
+| 서브프로그램 | 설명 | 주요 사용 사례 |
+| :--- | :--- | :--- |
+| **CREATE_PROFILE** | [cite: 1980] LLM 제공자, 모델, 대상 테이블 등을 지정하여 AI 프로파일 생성 | 새로운 데이터 소스 연결, 모델 변경 |
+| **SET_PROFILE** | [cite: 2015] 현재 세션에서 사용할 AI 프로파일 활성화 | 프로파일 전환, 세션 설정 |
+| **GENERATE** | [cite: 2011] AI에게 작업을 요청하는 핵심 함수. `runsql`, `showsql`, `narrate`, `chat`, `summarize` 등의 액션 수행 | 모든 자연어 쿼리 |
+| **CREATE_VECTOR_INDEX** | [cite: 2059] 비정형 데이터를 벡터화하여 인덱스 생성 (RAG용) | 문서 검색, RAG 구현 |
+| **FEEDBACK** | [cite: 2000] AI가 생성한 쿼리에 대해 긍정/부정 피드백을 제공하여 정확도 개선 | 쿼리 품질 개선 |
+| **GENERATE_SYNTHETIC_DATA** | [cite: 2049] 개발/테스트용 가상 데이터를 생성 | 테스트 데이터 생성 |
+| **SUMMARIZE** | [cite: 2043] 긴 텍스트 내용을 요약 (문단 또는 리스트 형태) | 리포트 요약, 텍스트 압축 |
+
+### 8.2 GENERATE 함수 상세
+
+#### 기본 문법
+
+```sql
+DBMS_CLOUD_AI.GENERATE(
+  prompt         IN VARCHAR2,
+  profile_name   IN VARCHAR2 DEFAULT NULL,
+  action         IN VARCHAR2 DEFAULT 'runsql',
+  conversation_id IN NUMBER DEFAULT NULL,
+  return_citations IN BOOLEAN DEFAULT FALSE
+) RETURN CLOB;
+```
+
+#### 액션 타입
+
+| 액션 | 설명 | 반환값 | 사용 예 |
+|------|------|--------|---------|
+| **runsql** | SQL 생성 및 실행, 결과 반환 | 쿼리 결과 (JSON) | 데이터 조회 |
+| **showsql** | SQL만 생성하여 반환 (실행 안 함) | SQL 문자열 | SQL 검증, 학습 |
+| **narrate** | RAG 기반 자연어 답변 생성 | 텍스트 답변 + 출처 | 문서 검색 질의응답 |
+| **chat** | 일반 대화 (데이터 조회 없음) | 텍스트 응답 | 일반 질문, 도움말 |
+| **summarize** | 텍스트 요약 | 요약문 | 긴 텍스트 압축 |
+
+#### 실습 예제
+
+```sql
+-- 예제 1: SQL 생성 및 실행
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '판매량 상위 10개 제품과 판매액을 보여줘',
+  action => 'runsql'
+) FROM DUAL;
+
+-- 예제 2: SQL만 확인 (실행 안 함)
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '지난 달 신규 고객 수는?',
+  action => 'showsql'
+) FROM DUAL;
+
+-- 예제 3: RAG 질의응답
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '연차 사용 규정은?',
+  action => 'narrate',
+  return_citations => TRUE
+) FROM DUAL;
+
+-- 예제 4: 대화 모드
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => 'Select AI가 뭐야?',
+  action => 'chat'
+) FROM DUAL;
+
+-- 예제 5: 텍스트 요약
+SELECT DBMS_CLOUD_AI.SUMMARIZE(
+  data => 'Long text content here...',
+  format => 'paragraph'  -- 또는 'list'
+) FROM DUAL;
+```
+
+### 8.3 대화 관리 함수
+
+```sql
+-- 대화 생성
+DECLARE
+  v_conv_id NUMBER;
+BEGIN
+  v_conv_id := DBMS_CLOUD_AI.CREATE_CONVERSATION(
+    profile_name => 'MY_PROFILE',
+    description => 'Q4 Sales Analysis',
+    attributes => JSON_OBJECT('retention_days' VALUE 30)
+  );
+  DBMS_OUTPUT.PUT_LINE('Conversation ID: ' || v_conv_id);
+END;
+/
+
+-- 대화 ID 설정
+BEGIN
+  DBMS_CLOUD_AI.SET_CONVERSATION_ID(conversation_id => 12345);
+END;
+/
+
+-- 현재 대화 ID 확인
+SELECT DBMS_CLOUD_AI.GET_CONVERSATION_ID() FROM DUAL;
+
+-- 대화 컨텍스트 초기화
+BEGIN
+  DBMS_CLOUD_AI.CLEAR_CONVERSATION_ID();
+END;
+/
+
+-- 대화 삭제
+BEGIN
+  DBMS_CLOUD_AI.DROP_CONVERSATION(conversation_id => 12345);
+END;
+/
+```
+
+### 8.4 프로파일 관리
+
+```sql
+-- 프로파일 목록 조회
+SELECT 
+  profile_name,
+  status,
+  created_date,
+  modified_date
+FROM USER_CLOUD_AI_PROFILES
+ORDER BY created_date DESC;
+
+-- 프로파일 상세 확인
+SELECT 
+  profile_name,
+  attributes
+FROM USER_CLOUD_AI_PROFILES
+WHERE profile_name = 'MY_PROFILE';
+
+-- 프로파일 수정
+BEGIN
+  DBMS_CLOUD_AI.DROP_PROFILE(
+    profile_name => 'OLD_PROFILE'
+  );
+  
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'NEW_PROFILE',
+    attributes => '...'
+  );
+END;
+/
+
+-- 현재 활성 프로파일 확인
+SELECT SYS_CONTEXT('CLOUD_AI', 'PROFILE_NAME') as current_profile
+FROM DUAL;
+```
+
+### 8.5 피드백 및 학습
+
+```sql
+-- 긍정 피드백 (쿼리가 정확함)
+BEGIN
+  DBMS_CLOUD_AI.FEEDBACK(
+    feedback_type => 'positive',
+    prompt => '판매량 상위 10개 제품',
+    generated_sql => 'SELECT product_name, sales FROM ...',
+    comments => '완벽한 쿼리입니다'
+  );
+END;
+/
+
+-- 부정 피드백 (쿼리 수정 필요)
+BEGIN
+  DBMS_CLOUD_AI.FEEDBACK(
+    feedback_type => 'negative',
+    prompt => '지난 주 매출',
+    generated_sql => 'SELECT * FROM sales WHERE ...',
+    correct_sql => 'SELECT SUM(amount) FROM sales WHERE week = ...',
+    comments => '집계 함수를 사용해야 합니다'
+  );
+END;
+/
+
+-- 피드백 이력 조회
+SELECT 
+  feedback_date,
+  feedback_type,
+  prompt,
+  generated_sql,
+  comments
+FROM USER_CLOUD_AI_FEEDBACK
+ORDER BY feedback_date DESC
+FETCH FIRST 10 ROWS ONLY;
+```
+
+---
+
+## 9. 트러블슈팅 및 FAQ
+
+### 9.1 일반적인 오류 및 해결 방법
+
+#### 오류 1: Database Link 연결 실패
+
+```
+ORA-02019: connection description for remote database not found
+```
+
+**원인:**
+- Database Link 이름 오타
+- 원격 데이터베이스 접근 불가 (네트워크, 방화벽)
+- Credential 오류
+
+**해결책:**
+
+```sql
+-- 1. Database Link 존재 확인
+SELECT db_link FROM USER_DB_LINKS;
+
+-- 2. 연결 테스트
+SELECT * FROM DUAL@MYSQL_ECOMMERCE_LINK;
+
+-- 3. Credential 재생성
+BEGIN
+  DBMS_CLOUD.DROP_CREDENTIAL('MYSQL_CRED');
+  DBMS_CLOUD.CREATE_CREDENTIAL(
+    credential_name => 'MYSQL_CRED',
+    username => 'correct_username',
+    password => 'correct_password'
+  );
+END;
+/
+
+-- 4. Database Link 재생성
+BEGIN
+  DBMS_CLOUD_ADMIN.DROP_DATABASE_LINK('MYSQL_ECOMMERCE_LINK');
+  DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
+    db_link_name => 'MYSQL_ECOMMERCE_LINK',
+    hostname => 'correct-hostname.rds.amazonaws.com',
+    port => '3306',
+    service_name => 'ecommerce',
+    credential_name => 'MYSQL_CRED'
+  );
+END;
+/
+```
+
+#### 오류 2: Iceberg External Table 읽기 실패
+
+```
+ORA-29913: error in executing ODCIEXTTABLEOPEN callout
+```
+
+**원인:**
+- S3 접근 권한 부족
+- Iceberg metadata.json 경로 오류
+- Credential 만료 또는 잘못됨
+
+**해결책:**
+
+```sql
+-- 1. Credential 확인
+SELECT credential_name, username, enabled
+FROM USER_CREDENTIALS
+WHERE credential_name = 'AWS_GLUE_CRED';
+
+-- 2. S3 접근 테스트
+SELECT * 
+FROM DBMS_CLOUD.LIST_OBJECTS(
+  credential_name => 'AWS_GLUE_CRED',
+  location_uri => 's3://my-data-lake/warehouse/'
+);
+
+-- 3. External Table 재생성
+BEGIN
+  DBMS_CLOUD.DROP_EXTERNAL_TABLE('WEB_EVENTS_ICEBERG');
+  
+  DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+    table_name => 'WEB_EVENTS_ICEBERG',
+    credential_name => 'AWS_GLUE_CRED',
+    format => JSON_OBJECT(
+      'type' VALUE 'iceberg',
+      'metadata_location' VALUE 's3://my-data-lake/warehouse/analytics/web_events/metadata/v3.metadata.json'
+    ),
+    column_list => '...'
+  );
+END;
+/
+```
+
+#### 오류 3: Select AI가 잘못된 SQL 생성
+
+**증상:**
+- LLM이 존재하지 않는 컬럼 참조
+- 잘못된 조인 조건
+- 부적절한 집계 함수 사용
+
+**해결책:**
+
+```sql
+-- 1. 테이블과 컬럼에 상세한 주석 추가
+COMMENT ON TABLE products IS 
+'Product catalog with inventory tracking. Primary key: product_id. 
+Foreign keys: supplier_id references suppliers(id)';
+
+COMMENT ON COLUMN products.price IS 
+'Unit price in USD. Always positive. Use for revenue calculations';
+
+-- 2. 프로파일에 comments 옵션 활성화
+BEGIN
+  DBMS_CLOUD_AI.DROP_PROFILE('MY_PROFILE');
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'MY_PROFILE',
+    attributes => JSON_OBJECT(
+      'provider' VALUE 'oci',
+      'comments' VALUE 'true',  -- 중요!
+      'object_list' VALUE JSON_ARRAY(...)
+    )
+  );
+END;
+/
+
+-- 3. 부정 피드백 제공
+BEGIN
+  DBMS_CLOUD_AI.FEEDBACK(
+    feedback_type => 'negative',
+    prompt => '판매량이 높은 제품',
+    generated_sql => 'SELECT * FROM products WHERE sales > 100',  -- 잘못된 쿼리
+    correct_sql => 'SELECT product_name, SUM(quantity) as total_sales 
+                    FROM order_items GROUP BY product_name 
+                    ORDER BY total_sales DESC',
+    comments => 'sales 컬럼은 없습니다. order_items 테이블의 quantity를 집계해야 합니다'
+  );
+END;
+/
+```
+
+### 9.2 성능 최적화
+
+#### 느린 원격 쿼리
+
+**문제:** MySQL이나 Iceberg 테이블 조회 시 응답 속도가 느림
+
+**해결책:**
+
+```sql
+-- 1. Materialized View로 자주 사용하는 데이터 캐시
+CREATE MATERIALIZED VIEW products_mv
+BUILD IMMEDIATE
+REFRESH COMPLETE ON DEMAND
+AS
+SELECT * FROM products@MYSQL_ECOMMERCE_LINK;
+
+-- 2. 스케줄러로 주기적 갱신
+BEGIN
+  DBMS_SCHEDULER.CREATE_JOB(
+    job_name => 'REFRESH_PRODUCTS_MV',
+    job_type => 'PLSQL_BLOCK',
+    job_action => 'BEGIN DBMS_MVIEW.REFRESH(''PRODUCTS_MV''); END;',
+    start_date => SYSTIMESTAMP,
+    repeat_interval => 'FREQ=HOURLY; INTERVAL=1',
+    enabled => TRUE
+  );
+END;
+/
+
+-- 3. 프로파일에 캐시된 뷰 사용
+BEGIN
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'OPTIMIZED_PROFILE',
+    attributes => JSON_OBJECT(
+      'object_list' VALUE JSON_ARRAY(
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'PRODUCTS_MV')  -- 원본 대신 MV 사용
+      )
+    )
+  );
+END;
+/
+```
+
+#### 대량 데이터 조인 최적화
+
+```sql
+-- 실행 계획 확인
+EXPLAIN PLAN FOR
+SELECT c.customer_name, o.order_date, o.total_amount
+FROM customers c
+JOIN orders@MYSQL_ECOMMERCE_LINK o ON c.customer_id = o.customer_id;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+-- 힌트 사용하여 최적화
+SELECT /*+ USE_HASH(c o) LEADING(c) */ 
+  c.customer_name, 
+  o.order_date, 
+  o.total_amount
+FROM customers c
+JOIN orders@MYSQL_ECOMMERCE_LINK o ON c.customer_id = o.customer_id;
+```
+
+### 9.3 FAQ
+
+**Q1: Select AI는 어떤 LLM을 지원하나요?**
+
+A: 다음 LLM 제공자를 지원합니다:
+- OCI Generative AI: Cohere Command, Meta Llama
+- OpenAI: GPT-4, GPT-3.5
+- Azure OpenAI
+- Google Vertex AI: PaLM, Gemini
+- Anthropic Claude (via 3rd party integration)
+
+**Q2: 무료 티어에서 Select AI를 사용할 수 있나요?**
+
+A: Oracle Autonomous Database Always Free 티어에서 Select AI 기능을 사용할 수 있습니다. 단, LLM API 호출에 대한 비용은 별도로 발생합니다.
+
+**Q3: 데이터베이스 외부로 데이터가 전송되나요?**
+
+A: 네. Select AI는 LLM에게 다음을 전송합니다:
+- 사용자의 자연어 질문
+- 데이터베이스 스키마 정보 (테이블명, 컬럼명, 주석)
+- 생성된 SQL 쿼리
+- (선택적) 쿼리 결과 샘플
+
+**실제 데이터**는 기본적으로 전송되지 않지만, `narrate`나 `chat` 액션 사용 시 일부 데이터가 포함될 수 있습니다.
+
+**Q4: 민감한 데이터를 보호하려면?**
+
+A: 다음 방법을 권장합니다:
+1. RAS를 사용하여 row-level security 적용
+2. 민감한 컬럼은 프로파일의 `object_list`에서 제외
+3. VPD(Virtual Private Database) 정책 적용
+4. 프라이빗 LLM 엔드포인트 사용 (OCI 내부)
+
+**Q5: 한국어 질문이 가능한가요?**
+
+A: 네. 대부분의 최신 LLM은 한국어를 지원합니다. 다음 모델 추천:
+- Cohere Command R+ (다국어 우수)
+- GPT-4
+- Claude 3
+
+단, 테이블/컬럼 이름과 주석은 영어로 작성하는 것을 권장합니다.
+
+**Q6: 연합 쿼리의 성능은 어떤가요?**
+
+A: 성능은 다음 요소에 영향을 받습니다:
+- 원격 데이터베이스의 네트워크 지연시간
+- 조인되는 데이터 볼륨
+- 원격 DB의 인덱스 상태
+
+최적화 방법:
+- 자주 사용하는 데이터는 Materialized View로 캐시
+- 필터 조건을 원격 DB에 푸시다운
+- 대량 조인은 ETL로 전환 고려
+
+**Q7: Select AI 사용량을 모니터링하려면?**
+
+```sql
+-- 사용 통계 조회
+SELECT 
+  prompt_date,
+  COUNT(*) as query_count,
+  AVG(execution_time_ms) as avg_response_time,
+  COUNT(DISTINCT user_id) as unique_users
+FROM USER_CLOUD_AI_USAGE_STATS
+WHERE prompt_date >= SYSDATE - 7
+GROUP BY prompt_date
+ORDER BY prompt_date DESC;
+
+-- 비용 추정 (LLM API 호출 기준)
+SELECT 
+  SUM(input_tokens) as total_input_tokens,
+  SUM(output_tokens) as total_output_tokens,
+  SUM(input_tokens) * 0.000015 + SUM(output_tokens) * 0.00002 as estimated_cost_usd
+FROM USER_CLOUD_AI_LLM_CALLS
+WHERE call_date >= TRUNC(SYSDATE, 'MM');  -- 이번 달
+```
+
+---
+
+## 10. 참고 자료 및 다음 단계
+
+### 10.1 공식 문서
+
+- [Oracle Select AI Documentation](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/select-ai-overview.html)
+- [DBMS_CLOUD_AI Package Reference](https://docs.oracle.com/en/cloud/paas/autonomous-database/serverless/adbsb/dbms-cloud-ai.html)
+- [Apache Iceberg Documentation](https://iceberg.apache.org/)
+- [OCI Generative AI Service](https://docs.oracle.com/en-us/iaas/Content/generative-ai/home.htm)
+
+### 10.2 샘플 코드 및 튜토리얼
+
+- Oracle LiveLabs: Select AI Workshops
+- GitHub: Oracle Database Examples
+- OCI Code Samples Repository
+
+### 10.3 커뮤니티
+
+- Oracle AI & Data Science Forum
+- Oracle Cloud Infrastructure Community
+- Stack Overflow: [oracle-select-ai] 태그
+
+### 10.4 다음 학습 주제
+
+완료한 핸즈온을 바탕으로 다음 단계를 진행하세요:
+
+1. **고급 RAG 구현**
+   - 하이브리드 검색 (Dense + Sparse)
+   - Re-ranking 전략
+   - Multi-hop 질문 처리
+
+2. **프로덕션 배포**
+   - REST API 래퍼 구축
+   - 캐싱 전략
+   - 사용량 모니터링 대시보드
+
+3. **AI Agent 구축**
+   - Select AI + LangChain 통합
+   - 자동화된 데이터 분석 파이프라인
+   - Slack/Teams 챗봇 통합
+
+4. **엔터프라이즈 거버넌스**
+   - RAS 정책 설계
+   - 감사 로그 분석
+   - 비용 최적화 전략
+
+### 10.5 실습 완료 체크리스트
+
+모든 핸즈온을 완료하셨나요? 다음 항목을 확인해보세요:
+
+#### 기본 기능
+- [ ] Select AI 프로파일 생성 및 활성화
+- [ ] 자연어 질문으로 데이터 조회 성공
+- [ ] `runsql`, `showsql`, `narrate` 액션 사용
+- [ ] 대화형 쿼리 (Conversation) 테스트
+
+#### 연합 쿼리
+- [ ] MySQL Database Link 생성
+- [ ] Iceberg External Table 연결
+- [ ] Oracle + MySQL 2-Way 조인 쿼리
+- [ ] Oracle + MySQL + Iceberg 3-Way 조인 쿼리
+
+#### 고급 기능
+- [ ] RAG 벡터 인덱스 생성
+- [ ] 문서 기반 질의응답 테스트
+- [ ] RAS 보안 정책 구현
+- [ ] 메타데이터 주석으로 정확도 개선
+
+#### 최적화
+- [ ] Materialized View로 성능 개선
+- [ ] 쿼리 피드백 제공
+- [ ] 사용량 모니터링 설정
+
+---
+
+## 부록 A: 치트 시트
+
+### 빠른 참조 - 자주 사용하는 명령어
+
+```sql
+-- ========================================
+-- 프로파일 관리
+-- ========================================
+
+-- 프로파일 생성
+BEGIN
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'MY_PROFILE',
+    attributes => JSON_OBJECT(
+      'provider' VALUE 'oci',
+      'credential_name' VALUE 'OCI_CRED',
+      'model' VALUE 'cohere.command-r-plus',
+      'comments' VALUE 'true',
+      'object_list' VALUE JSON_ARRAY(
+        JSON_OBJECT('owner' VALUE 'ADMIN', 'name' VALUE 'TABLE_NAME')
+      )
+    )
+  );
+END;
+/
+
+-- 프로파일 활성화
+EXEC DBMS_CLOUD_AI.SET_PROFILE('MY_PROFILE');
+
+-- 프로파일 삭제
+EXEC DBMS_CLOUD_AI.DROP_PROFILE('MY_PROFILE');
+
+-- ========================================
+-- 쿼리 실행
+-- ========================================
+
+-- SQL 실행하여 결과 반환
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '질문',
+  action => 'runsql'
+) FROM DUAL;
+
+-- SQL만 확인 (실행 안 함)
+SELECT DBMS_CLOUD_AI.GENERATE(
+  prompt => '질문',
+  action => 'showsql'
+) FROM DUAL;
+
+-- ========================================
+-- Database Link (MySQL/PostgreSQL)
+-- ========================================
+
+-- Credential 생성
+EXEC DBMS_CLOUD.CREATE_CREDENTIAL('DB_CRED', 'username', 'password');
+
+-- Database Link 생성
+EXEC DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
+  db_link_name => 'REMOTE_DB',
+  hostname => 'host.example.com',
+  port => '3306',
+  service_name => 'database_name',
+  credential_name => 'DB_CRED'
+);
+
+-- ========================================
+-- Iceberg External Table
+-- ========================================
+
+BEGIN
+  DBMS_CLOUD.CREATE_EXTERNAL_TABLE(
+    table_name => 'ICEBERG_TABLE',
+    credential_name => 'AWS_CRED',
+    format => JSON_OBJECT(
+      'type' VALUE 'iceberg',
+      'metadata_location' VALUE 's3://bucket/path/metadata.json'
+    ),
+    column_list => '...'
+  );
+END;
+/
+
+-- ========================================
+-- 대화 관리
+-- ========================================
+
+-- 대화 시작
+v_conv_id := DBMS_CLOUD_AI.CREATE_CONVERSATION(profile_name => 'MY_PROFILE');
+
+-- 대화 설정
+EXEC DBMS_CLOUD_AI.SET_CONVERSATION_ID(v_conv_id);
+
+-- 대화 초기화
+EXEC DBMS_CLOUD_AI.CLEAR_CONVERSATION_ID();
+
+-- ========================================
+-- 모니터링
+-- ========================================
+
+-- 활성 프로파일
+SELECT SYS_CONTEXT('CLOUD_AI', 'PROFILE_NAME') FROM DUAL;
+
+-- 사용 통계
+SELECT * FROM USER_CLOUD_AI_USAGE_STATS;
+
+-- Database Link 목록
+SELECT * FROM USER_DB_LINKS;
+
+-- External Table 목록
+SELECT * FROM USER_EXTERNAL_TABLES;
+```
+
+---
+
+**축하합니다! 🎉**
+
+Oracle Select AI with Proxy Database 핸즈온을 완료하셨습니다. 이제 여러분은:
+- ✅ 여러 데이터베이스를 통합하여 자연어로 조회할 수 있습니다
+- ✅ 데이터 레이크(Iceberg)와 관계형 DB를 동시에 쿼리할 수 있습니다
+- ✅ RAG를 활용하여 문서와 데이터를 통합 분석할 수 있습니다
+- ✅ 엔터프라이즈급 보안과 거버넌스를 구현할 수 있습니다
+
+질문이나 피드백이 있으시면 Oracle AI Community에 공유해주세요!
