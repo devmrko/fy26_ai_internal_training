@@ -1,6 +1,6 @@
-# Oracle Autonomous AI Database: Select AI Agent 교육 과정
+## Oracle Autonomous AI Database: Select AI Agent 교육 과정
 
-## 문서 개요
+#### 문서 개요:
 
 본 교육 과정은 Oracle Autonomous Database의 **Select AI Agent** 기능을 활용하여 지능형 자율 에이전트를 구축하는 방법을 단계별로 학습합니다.
 
@@ -25,7 +25,7 @@
 
 ---
 
-## 목차
+#### 목차:
 
 ### [1부] Select AI Agent 개념 및 아키텍처
 1. Select AI Agent란 무엇인가?
@@ -78,13 +78,13 @@
 
 ---
 
-## [1부] Select AI Agent 개념 및 아키텍처
+### [1부] Select AI Agent 개념 및 아키텍처
 
-### 1. Select AI Agent란 무엇인가?
+##### 1. Select AI Agent란 무엇인가?
 
 **Select AI Agent**는 Oracle Autonomous Database에 내장된 대화형 자율 에이전트 프레임워크입니다. 
 
-#### 핵심 개념
+###### 핵심 개념
 기존 Select AI가 **단순 질의응답**에 집중했다면, Select AI Agent는 **복잡한 작업을 스스로 계획하고 실행**할 수 있는 진정한 의미의 AI 에이전트입니다.
 
 ```
@@ -104,15 +104,15 @@
 └─────────────────────────────────────────────────────┘
 ```
 
-#### 핵심 기능 (Key Features)
+###### 핵심 기능 (Key Features)
 
-##### 1.1 통합 지능 (Integrated Intelligence)
+###### 1.1 통합 지능 (Integrated Intelligence)
 에이전트는 다음 3가지 능력을 통합합니다:
 - **계획(Planning)**: 복잡한 작업을 단계별로 분해
 - **도구 사용(Tool Use)**: 데이터베이스 조회, 함수 호출, API 실행
 - **성찰(Reflection)**: 중간 결과를 검토하고 계획 수정
 
-##### 1.2 유연한 도구 (Flexible Tooling)
+###### 1.2 유연한 도구 (Flexible Tooling)
 다양한 도구를 에이전트가 자유롭게 활용할 수 있습니다:
 | 도구 유형 | 설명 | 예시 |
 |----------|------|------|
@@ -122,12 +122,12 @@
 | **REST API Tool** | 외부 시스템 연동 | Slack 알림, 이메일 발송 |
 | **WebSearch Tool** | 인터넷 정보 검색 | 최신 환율 정보 |
 
-##### 1.3 문맥 인식 대화 (Context-Aware Conversations)
+###### 1.3 문맥 인식 대화 (Context-Aware Conversations)
 - **단기 기억**: 현재 대화 세션의 문맥 유지
 - **장기 기억**: 이전 대화 내용 기반 개인화된 응답
 - **멀티턴 대화**: 추가 질문을 통해 정보 수집
 
-##### 1.4 확장성 및 보안 (Scalable and Secure)
+###### 1.4 확장성 및 보안 (Scalable and Secure)
 데이터베이스 내부에서 실행되므로:
 - 데이터 이동 없이 안전한 처리
 - DB의 접근 제어 및 감사 기능 활용
@@ -136,11 +136,11 @@
 
 ---
 
-### 2. 작동 원리: ReAct 패턴
+##### 2. 작동 원리: ReAct 패턴
 
 Select AI Agent는 **ReAct (Reasoning and Acting)** 패턴을 사용합니다. 이는 Google DeepMind와 Princeton 대학이 제안한 방법론으로, LLM이 추론과 행동을 반복하며 문제를 해결하도록 합니다.
 
-#### ReAct 사이클
+###### ReAct 사이클
 
 ```
 ┌────────────────────────────────────────────────────┐
@@ -180,7 +180,7 @@ Select AI Agent는 **ReAct (Reasoning and Acting)** 패턴을 사용합니다. �
 └────────────────────────────────────────────────────┘
 ```
 
-#### ReAct 실행 예시 (실제 로그)
+###### ReAct 실행 예시 (실제 로그)
 
 실제 에이전트 실행 시 다음과 같은 로그를 확인할 수 있습니다:
 
@@ -206,7 +206,7 @@ Final Answer: 주문 10248에 대한 반품이 접수되었습니다.
 
 ---
 
-### 3. 아키텍처 및 구성 요소
+##### 3. 아키텍처 및 구성 요소
 
 Select AI Agent는 **4계층 아키텍처**를 통해 지능형 작업을 수행합니다.
 
@@ -242,7 +242,7 @@ Select AI Agent는 **4계층 아키텍처**를 통해 지능형 작업을 수행
 
 Select AI Agent는 다음 4가지 객체의 조합으로 동작합니다:
 
-##### 3.1 Agent (에이전트)
+###### 3.1 Agent (에이전트)
 **특정 목적을 위해 설정된 작업자**
 
 ```sql
@@ -259,7 +259,7 @@ CREATE_AGENT(
 - **역할(Role)**: 에이전트의 페르소나와 행동 방식 정의
 - 하나의 에이전트는 여러 작업(Task)을 수행할 수 있습니다
 
-##### 3.2 Tool (도구)
+###### 3.2 Tool (도구)
 **에이전트가 수행할 수 있는 구체적인 행동**
 
 ```sql
@@ -281,7 +281,7 @@ CREATE_TOOL(
 | `RAG` | `tool_type: "RAG"` | 벡터 검색으로 문서 찾기 |
 | `REST API` | `endpoint_url: "..."` | 외부 시스템 호출 |
 
-##### 3.3 Task (작업)
+###### 3.3 Task (작업)
 **에이전트가 수행해야 할 업무 단위**
 
 ```sql
@@ -304,7 +304,7 @@ CREATE_TASK(
 - **지침**: 어떻게 수행할 것인가?
 - **도구 목록**: 어떤 도구를 사용할 수 있는가?
 
-##### 3.4 Agent Team (팀)
+###### 3.4 Agent Team (팀)
 **여러 에이전트의 협업 단위**
 
 ```sql
@@ -323,7 +323,7 @@ CREATE_TEAM(
 - `sequential`: 에이전트들이 순서대로 작업 수행
 - `parallel`: 여러 에이전트가 동시에 작업 수행 (향후 지원 예정)
 
-#### 객체 간 관계도
+###### 객체 간 관계도
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -346,7 +346,7 @@ CREATE_TEAM(
 
 ---
 
-## [2부] 핸즈온: Northwind 스마트 에이전트 구축하기
+### [2부] 핸즈온: Northwind 스마트 에이전트 구축하기
 
 ### 실습 시나리오
 
@@ -364,15 +364,15 @@ CREATE_TEAM(
 
 ---
 
-### Step 1: 사전 준비 및 권한 설정
+##### Step 1: 사전 준비 및 권한 설정
 
-#### 1.1 필요 권한 확인
+###### 1.1 필요 권한 확인
 
 Select AI Agent를 사용하려면 다음 패키지에 대한 실행 권한이 필요합니다:
 - `DBMS_CLOUD_AI_AGENT` - 에이전트 생성 및 관리
 - `DBMS_CLOUD_AI` - AI 프로파일 사용
 
-#### 1.2 권한 부여 (ADMIN 계정에서 실행)
+###### 1.2 권한 부여 (ADMIN 계정에서 실행)
 
 ```sql
 -- ===============================================
@@ -393,7 +393,7 @@ WHERE GRANTEE = 'NORTHWIND'
 
 **팁**: 권한이 제대로 부여되었는지 확인하세요. `EXECUTE` 권한이 두 개의 패키지에 모두 있어야 합니다.
 
-#### 1.3 네트워크 ACL 설정 (선택사항)
+###### 1.3 네트워크 ACL 설정 (선택사항)
 
 외부 API(WebSearch, 이메일 등)를 사용할 경우 네트워크 접근 권한이 필요합니다.
 
@@ -434,7 +434,7 @@ FROM DBA_NETWORK_ACLS
 WHERE ACL LIKE '%NORTHWIND%';
 ```
 
-#### 1.4 AI 프로파일 확인
+###### 1.4 AI 프로파일 확인
 
 1회차에서 생성한 `NORTHWIND_AI` 프로파일이 있는지 확인합니다.
 
@@ -470,11 +470,11 @@ WHERE PROFILE_NAME = 'NORTHWIND_AI';
 
 ---
 
-### Step 2: 도구(Tool) 생성
+##### Step 2: 도구(Tool) 생성
 
 에이전트가 사용할 **무기**를 만듭니다. 도구는 에이전트가 실제로 작업을 수행하는 수단입니다.
 
-#### 2.1 SQL Tool 생성 (데이터 조회용)
+###### 2.1 SQL Tool 생성 (데이터 조회용)
 
 **목적**: 자연어 질문을 SQL 쿼리로 변환하여 데이터베이스를 조회하는 도구
 
@@ -527,7 +527,7 @@ WHERE TOOL_NAME = 'SQL_Analysis_Tool';
 
 ---
 
-#### 2.2 PL/SQL Tool 생성 (반품 처리 로직)
+###### 2.2 PL/SQL Tool 생성 (반품 처리 로직)
 
 **목적**: 실제 비즈니스 로직을 수행하는 도구 (RMA 번호 생성)
 
@@ -621,7 +621,7 @@ WHERE TOOL_NAME = 'Return_Auth_Generator';
 
 ---
 
-#### 2.3 생성된 도구 확인
+###### 2.3 생성된 도구 확인
 
 ```sql
 -- ===============================================
@@ -662,11 +662,11 @@ SQL_Analysis_Tool     SQL          Queries the database for...
 
 ---
 
-### Step 3: 작업(Task) 생성
+##### Step 3: 작업(Task) 생성
 
 **Task**는 에이전트의 **업무 매뉴얼**입니다. 무엇을 하고, 어떻게 할지를 구체적으로 정의합니다.
 
-#### 3.1 Task 개념 이해
+###### 3.1 Task 개념 이해
 
 **Task는 다음을 포함합니다:**
 1. **Instruction (지침)**: 에이전트가 따라야 할 규칙과 절차
@@ -689,7 +689,7 @@ SQL_Analysis_Tool     SQL          Queries the database for...
 └─────────────────────────────────────────┘
 ```
 
-#### 3.2 Task 생성
+###### 3.2 Task 생성
 
 ```sql
 -- ===============================================
@@ -736,7 +736,7 @@ END;
 - **예외 처리**: 정보가 부족할 때 어떻게 할지 명시
 - **영어 사용**: 현재 버전에서는 영어 지침이 가장 잘 동작합니다
 
-#### 3.3 enable_human_tool 이해
+###### 3.3 enable_human_tool 이해
 
 `enable_human_tool: true`로 설정하면, 에이전트가 **사용자에게 질문**할 수 있습니다.
 
@@ -751,7 +751,7 @@ END;
   "주문 번호가 필요합니다." (더 이상 진행 불가)
 ```
 
-#### 3.4 Task 확인
+###### 3.4 Task 확인
 
 ```sql
 -- Task 목록 조회
@@ -777,11 +777,11 @@ WHERE TASK_NAME = 'Customer_Service_Task';
 
 ---
 
-### Step 4: 에이전트(Agent) 생성
+##### Step 4: 에이전트(Agent) 생성
 
 **Agent**는 실제로 작업을 수행하는 **주체**입니다. 에이전트에게 성격과 전문성을 부여합니다.
 
-#### 4.1 Agent 개념
+###### 4.1 Agent 개념
 
 에이전트는 다음을 가집니다:
 - **Profile**: 사용할 LLM 모델 (GPT-4, Claude 등)
@@ -798,7 +798,7 @@ WHERE TASK_NAME = 'Customer_Service_Task';
 └───────────────────────────────────────────┘
 ```
 
-#### 4.2 Agent 생성
+###### 4.2 Agent 생성
 
 ```sql
 -- ===============================================
@@ -833,7 +833,7 @@ END;
 "role": "helpful assistant"  너무 모호함
 ```
 
-#### 4.3 Agent 확인
+###### 4.3 Agent 확인
 
 ```sql
 -- Agent 목록 조회
@@ -853,11 +853,11 @@ WHERE AGENT_NAME = 'Northwind_Support_Bot';
 
 ---
 
-### Step 5: 팀(Team) 구성 및 활성화
+##### Step 5: 팀(Team) 구성 및 활성화
 
 **Team**은 에이전트와 작업을 **연결**하는 최종 단계입니다. 팀을 활성화해야 에이전트를 사용할 수 있습니다.
 
-#### 5.1 Team 개념
+###### 5.1 Team 개념
 
 ```
 ┌────────────────────────────────────────────┐
@@ -875,7 +875,7 @@ WHERE AGENT_NAME = 'Northwind_Support_Bot';
 └────────────────────────────────────────────┘
 ```
 
-#### 5.2 Team 생성
+###### 5.2 Team 생성
 
 ```sql
 -- ===============================================
@@ -918,7 +918,7 @@ END;
 ]
 ```
 
-#### 5.3 팀 활성화 (중요!)
+###### 5.3 팀 활성화 (중요!)
 
 팀을 생성했다고 끝이 아닙니다. **현재 세션에 팀을 활성화**해야 사용할 수 있습니다.
 
@@ -944,7 +944,7 @@ Northwind_Support_Team
 
 **중요**: `SET_TEAM`은 **세션 단위**로 적용됩니다. 새로운 SQL 세션을 열면 다시 설정해야 합니다.
 
-#### 5.4 Team 확인
+###### 5.4 Team 확인
 
 ```sql
 -- ===============================================
@@ -996,11 +996,11 @@ Team         Northwind_Support_Team
 
 ---
 
-### Step 6: 에이전트 실행 및 테스트
+##### Step 6: 에이전트 실행 및 테스트
 
 드디어 에이전트를 사용할 시간입니다! `SELECT AI AGENT` 구문으로 자연어로 대화합니다.
 
-#### 6.1 기본 문법
+###### 6.1 기본 문법
 
 ```sql
 -- 기본 형식
@@ -1017,7 +1017,7 @@ PRINT response;
 
 ---
 
-#### 6.2 테스트 케이스 1: 단순 데이터 조회
+###### 6.2 테스트 케이스 1: 단순 데이터 조회
 
 **목적**: SQL Tool이 제대로 작동하는지 확인
 
@@ -1057,7 +1057,7 @@ SELECT AI AGENT "What are the top 5 products by total revenue?";
 
 ---
 
-#### 6.3 테스트 케이스 2: 복합 추론 (Multi-turn)
+###### 6.3 테스트 케이스 2: 복합 추론 (Multi-turn)
 
 **목적**: 에이전트가 여러 단계의 추론을 거쳐 작업을 완수하는지 확인
 
@@ -1084,7 +1084,7 @@ SELECT AI AGENT "I received order 10248 but it is defective. I need to return it
 
 ---
 
-#### 6.4 테스트 케이스 3: Human Tool 활용
+###### 6.4 테스트 케이스 3: Human Tool 활용
 
 **목적**: 정보가 부족할 때 에이전트가 사용자에게 질문하는지 확인
 
@@ -1119,7 +1119,7 @@ SELECT AI AGENT "Order 10249";
 
 ---
 
-#### 6.5 테스트 케이스 4: 복합 작업
+###### 6.5 테스트 케이스 4: 복합 작업
 
 **목적**: 여러 도구를 조합하여 사용하는지 확인
 
@@ -1151,7 +1151,7 @@ SELECT AI AGENT "Show me the details of order 10250, and if the total is over $1
 
 ---
 
-#### 6.6 에이전트 실행 로그 확인
+###### 6.6 에이전트 실행 로그 확인
 
 에이전트가 어떤 사고 과정을 거쳤는지 상세 로그를 볼 수 있습니다.
 
@@ -1192,7 +1192,7 @@ STEP  THOUGHT                          ACTION              OBSERVATION
 
 ---
 
-#### 6.7 트러블슈팅
+###### 6.7 트러블슈팅
 
 ##### 문제 1: "No active team" 오류
 ```
@@ -1225,7 +1225,7 @@ END;
 
 ---
 
-## [3부] 고급 기능: Python SDK로 Agent 제어하기
+### [3부] 고급 기능: Python SDK로 Agent 제어하기
 
 데이터베이스 외부(웹 앱, 모바일 앱, Slack 봇 등)에서 에이전트를 사용하는 방법을 학습합니다.
 
@@ -1243,9 +1243,9 @@ END;
 
 ---
 
-### Step 7: Python 환경 설정
+##### Step 7: Python 환경 설정
 
-#### 7.1 필요 라이브러리 설치
+###### 7.1 필요 라이브러리 설치
 
 ```bash
 # 가상환경 생성 (권장)
@@ -1259,7 +1259,7 @@ pip install oracledb
 pip install python-dotenv
 ```
 
-#### 7.2 환경 변수 설정
+###### 7.2 환경 변수 설정
 
 `.env` 파일 생성:
 
@@ -1279,9 +1279,9 @@ WALLET_PASSWORD=wallet_password
 
 ---
 
-### Step 8: Python에서 Agent 실행
+##### Step 8: Python에서 Agent 실행
 
-#### 8.1 기본 Agent 호출 스크립트
+###### 8.1 기본 Agent 호출 스크립트
 
 파일: `agent_client.py`
 
@@ -1421,11 +1421,11 @@ Please use this RMA number when shipping back the defective item.
 
 ---
 
-### Step 9: 멀티턴 대화 구현
+##### Step 9: 멀티턴 대화 구현
 
 **멀티턴 대화**는 이전 대화 내용을 기억하며 연속적으로 대화하는 것입니다.
 
-#### 9.1 대화형 Agent 챗봇
+###### 9.1 대화형 Agent 챗봇
 
 파일: `chatbot.py`
 
@@ -1565,9 +1565,9 @@ You: quit
 
 ---
 
-### Step 10: 웹 API로 Agent 노출하기 (FastAPI)
+##### Step 10: 웹 API로 Agent 노출하기 (FastAPI)
 
-#### 10.1 FastAPI 애플리케이션
+###### 10.1 FastAPI 애플리케이션
 
 파일: `api_server.py`
 
@@ -1691,7 +1691,7 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
 
-#### 10.2 API 실행 및 테스트
+###### 10.2 API 실행 및 테스트
 
 **서버 실행:**
 ```bash
@@ -1732,11 +1732,11 @@ http://localhost:8000/docs
 
 ---
 
-### Step 11: 고급 Tool - RAG, WebSearch, Notification
+##### Step 11: 고급 Tool - RAG, WebSearch, Notification
 
 Select AI Agent는 SQL/PL/SQL 외에도 다양한 내장 도구를 지원합니다.
 
-#### 11.1 RAG Tool (문서 검색)
+###### 11.1 RAG Tool (문서 검색)
 
 **사용 사례**: 제품 매뉴얼, FAQ, 정책 문서 검색
 
@@ -1767,7 +1767,7 @@ END;
 SELECT AI AGENT "How do I install the Chai tea maker?";
 ```
 
-#### 11.2 WebSearch Tool (인터넷 검색)
+###### 11.2 WebSearch Tool (인터넷 검색)
 
 **사용 사례**: 최신 정보, 환율, 경쟁사 정보 조회
 
@@ -1796,7 +1796,7 @@ END;
 SELECT AI AGENT "What is the current USD to EUR exchange rate?";
 ```
 
-#### 11.3 Notification Tool (이메일/Slack)
+###### 11.3 Notification Tool (이메일/Slack)
 
 **사용 사례**: 주문 확인 이메일, 재고 부족 알림
 
@@ -1830,9 +1830,9 @@ SELECT AI AGENT "Send a confirmation email to customer ALFKI about order 10248";
 
 ---
 
-### Step 12: 실전 응용 예제
+##### Step 12: 실전 응용 예제
 
-#### 12.1 복합 비즈니스 프로세스 자동화
+###### 12.1 복합 비즈니스 프로세스 자동화
 
 **시나리오**: 재고가 부족한 제품을 자동으로 발주
 
@@ -1900,7 +1900,7 @@ END;
 SELECT AI AGENT "Check if we need to reorder Chai (product ID 1)";
 ```
 
-#### 12.2 데이터 분석 리포트 생성
+###### 12.2 데이터 분석 리포트 생성
 
 ```sql
 -- 판매 분석 리포트 생성 함수
@@ -1937,11 +1937,11 @@ END;
 
 ---
 
-### Step 13: Built-in Tools 확장 가이드
+##### Step 13: Built-in Tools 확장 가이드
 
 Select AI Agent는 다양한 내장 도구를 지원합니다.
 
-#### 13.1 지원 도구 유형
+###### 13.1 지원 도구 유형
 
 | 도구 유형 | Tool Type | 설명 | 사용 예시 |
 |----------|-----------|------|----------|
@@ -1953,7 +1953,7 @@ Select AI Agent는 다양한 내장 도구를 지원합니다.
 | Slack | `notification` | Slack 메시지 | 팀 협업 알림 |
 | REST API | `rest_api` | 외부 API 호출 | 결제, 배송 추적 |
 
-#### 13.2 REST API Tool 예시
+###### 13.2 REST API Tool 예시
 
 외부 API를 호출하는 도구를 만들 수 있습니다.
 
@@ -1976,7 +1976,7 @@ END;
 /
 ```
 
-#### 13.3 Slack Notification Tool 예시
+###### 13.3 Slack Notification Tool 예시
 
 ```sql
 -- Slack Notification 설정 (ADMIN 계정)
@@ -2014,11 +2014,11 @@ SELECT AI AGENT "Notify the team on Slack that we're running low on Chai (produc
 
 ---
 
-## [4부] 참고 자료 및 심화 학습
+### [4부] 참고 자료 및 심화 학습
 
 ### 주요 패키지
 
-#### DBMS_CLOUD_AI_AGENT 패키지
+###### DBMS_CLOUD_AI_AGENT 패키지
 
 모든 Select AI Agent 관련 기능을 제공하는 핵심 패키지입니다.
 
@@ -2041,7 +2041,7 @@ SELECT AI AGENT "Notify the team on Slack that we're running low on Chai (produc
 
 에이전트 객체들을 조회할 수 있는 데이터 딕셔너리 뷰입니다.
 
-#### USER_AI_AGENTS
+###### USER_AI_AGENTS
 내가 생성한 에이전트 목록
 
 ```sql
@@ -2063,7 +2063,7 @@ ORDER BY CREATED DESC;
 
 ---
 
-#### USER_AI_AGENT_TASKS
+###### USER_AI_AGENT_TASKS
 내가 생성한 작업 목록
 
 ```sql
@@ -2082,7 +2082,7 @@ ORDER BY CREATED DESC;
 
 ---
 
-#### USER_AI_AGENT_TOOLS
+###### USER_AI_AGENT_TOOLS
 내가 생성한 도구 목록
 
 ```sql
@@ -2104,7 +2104,7 @@ ORDER BY CREATED DESC;
 
 ---
 
-#### USER_AI_AGENT_TEAMS
+###### USER_AI_AGENT_TEAMS
 내가 생성한 팀 목록
 
 ```sql
@@ -2123,7 +2123,7 @@ ORDER BY CREATED DESC;
 
 ---
 
-#### USER_AI_AGENT_CHAT_HISTORY
+###### USER_AI_AGENT_CHAT_HISTORY
 에이전트와의 대화 기록
 
 ```sql
@@ -2145,7 +2145,7 @@ ORDER BY CREATED;
 
 ---
 
-#### USER_AI_AGENT_EXECUTION_LOG
+###### USER_AI_AGENT_EXECUTION_LOG
 에이전트의 상세 실행 로그 (디버깅용)
 
 ```sql
@@ -2175,7 +2175,7 @@ ORDER BY STEP_NUMBER;
 
 ### 유용한 관리 쿼리
 
-#### 모든 객체 삭제 (초기화)
+###### 모든 객체 삭제 (초기화)
 
 ```sql
 -- ===============================================
@@ -2215,7 +2215,7 @@ END;
 /
 ```
 
-#### 에이전트 성능 모니터링
+###### 에이전트 성능 모니터링
 
 ```sql
 -- 도구별 사용 빈도
@@ -2243,7 +2243,7 @@ GROUP BY TEAM_NAME;
 
 ### 트러블슈팅 가이드
 
-#### 문제 1: 에이전트가 응답하지 않음
+###### 문제 1: 에이전트가 응답하지 않음
 
 **증상:**
 ```sql
@@ -2275,7 +2275,7 @@ SELECT AI AGENT "test";
 
 ---
 
-#### 문제 2: 에이전트가 잘못된 도구를 선택함
+###### 문제 2: 에이전트가 잘못된 도구를 선택함
 
 **증상:**
 ```sql
@@ -2316,7 +2316,7 @@ SELECT AI AGENT "Return order 10248";
 
 ---
 
-#### 문제 3: 에이전트가 환각(Hallucination)을 보임
+###### 문제 3: 에이전트가 환각(Hallucination)을 보임
 
 **증상:**
 ```sql
@@ -2353,7 +2353,7 @@ SELECT AI AGENT "What is order 99999's status?";
 
 ---
 
-#### 문제 4: Python 연결 오류
+###### 문제 4: Python 연결 오류
 
 **증상:**
 ```python
@@ -2381,13 +2381,13 @@ print("DSN:", os.getenv("DB_DSN"))
 
 ### 추가 학습 자료
 
-#### Oracle 공식 문서
+###### Oracle 공식 문서
 - [Select AI Agent 개요](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-agent1.html)
 - [DBMS_CLOUD_AI_AGENT 패키지 레퍼런스](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/dbms-cloud-ai-agent-package.html)
 - [Agent Views 레퍼런스](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/dbms-cloud-ai-agent-views.html)
 - [실습 예제 모음](https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/examples-using-select-ai-agent.html)
 
-#### 추가 리소스
+###### 추가 리소스
 - Oracle LiveLabs: Select AI Agent 핸즈온 워크샵
 - Oracle Blogs: AI/ML 카테고리
 - Oracle Cloud Customer Connect: 커뮤니티 Q&A
@@ -2398,23 +2398,23 @@ print("DSN:", os.getenv("DB_DSN"))
 
 다음 기능들을 직접 구현해 보세요:
 
-#### 과제 1: 다중 에이전트 시스템
+###### 과제 1: 다중 에이전트 시스템
 - **Sales Analyst Agent**: 데이터 분석 전담
 - **Support Agent**: 고객 지원 전담  
 - **Inventory Agent**: 재고 관리 전담
 - 하나의 팀으로 협업하도록 구성
 
-#### 과제 2: RAG 기반 FAQ 봇
+###### 과제 2: RAG 기반 FAQ 봇
 - 제품 매뉴얼 PDF를 벡터화
 - RAG Tool을 활용한 Q&A 시스템
 - "How do I clean the espresso machine?" 같은 질문 처리
 
-#### 과제 3: Slack 봇 통합
+###### 과제 3: Slack 봇 통합
 - Slack 메시지를 받아 Agent에게 전달
 - Agent 응답을 Slack으로 전송
 - 슬래시 커맨드 (`/northwind ask ...`) 구현
 
-#### 과제 4: 실시간 대시보드
+###### 과제 4: 실시간 대시보드
 - Streamlit으로 Agent 챗봇 UI 구성
 - 대화 기록 시각화
 - Tool 사용 통계 차트
@@ -2553,11 +2553,11 @@ COMMIT;
 
 ---
 
-## [5부] 실습 가이드
+### [5부] 실습 가이드
 
 ### 처음부터 끝까지 따라하기 (20분 완성)
 
-#### 빠른 시작 가이드
+###### 빠른 시작 가이드
 
 **1단계: 연결 및 확인 (2분)**
 ```sql
@@ -3002,7 +3002,7 @@ streamlit run streamlit_agent_app.py
 
 ### 📖 FAQ (자주 묻는 질문)
 
-#### Q1: Select AI와 Select AI Agent의 차이는?
+###### Q1: Select AI와 Select AI Agent의 차이는?
 
 | 구분 | Select AI | Select AI Agent |
 |------|-----------|----------------|
@@ -3016,7 +3016,7 @@ streamlit run streamlit_agent_app.py
 
 ---
 
-#### Q2: 여러 LLM 모델을 혼합 사용할 수 있나요?
+###### Q2: 여러 LLM 모델을 혼합 사용할 수 있나요?
 
 **가능합니다!** 에이전트마다 다른 프로파일을 사용할 수 있습니다.
 
@@ -3040,7 +3040,7 @@ CREATE_AGENT(
 
 ---
 
-#### Q3: 에이전트가 사용할 수 있는 테이블을 제한할 수 있나요?
+###### Q3: 에이전트가 사용할 수 있는 테이블을 제한할 수 있나요?
 
 **가능합니다!** SQL Tool의 프로파일에서 제한합니다.
 
@@ -3067,7 +3067,7 @@ END;
 
 ---
 
-#### Q4: 에이전트 응답 시간이 너무 느려요
+###### Q4: 에이전트 응답 시간이 너무 느려요
 
 **원인별 해결책:**
 
@@ -3095,7 +3095,7 @@ WHERE CREATED >= SYSDATE - 1;
 
 ---
 
-#### Q5: 에이전트가 도구를 안 쓰고 직접 답변해요
+###### Q5: 에이전트가 도구를 안 쓰고 직접 답변해요
 
 **원인**: LLM이 자체 지식으로 답변 가능하다고 판단
 
@@ -3119,7 +3119,7 @@ END;
 
 ---
 
-#### Q6: 한국어로 질문하면 작동하나요?
+###### Q6: 한국어로 질문하면 작동하나요?
 
 **작동합니다!** 하지만 주의사항이 있습니다.
 
@@ -3137,7 +3137,7 @@ SELECT AI AGENT "가장 비싼 제품은 뭐야?";
 
 ---
 
-#### Q7: 대화 기록을 삭제하고 싶어요
+###### Q7: 대화 기록을 삭제하고 싶어요
 
 ```sql
 -- 특정 대화 삭제
@@ -3154,7 +3154,7 @@ COMMIT;
 
 ---
 
-#### Q8: Agent 비용은 얼마나 드나요?
+###### Q8: Agent 비용은 얼마나 드나요?
 
 **비용 구성:**
 1. **LLM API 비용**: OpenAI, Cohere 등의 사용량 기반 과금
@@ -3213,7 +3213,7 @@ Select AI Agent를 마스터했다면:
 
 ### 학습 정리
 
-#### 핵심 개념 요약
+###### 핵심 개념 요약
 
 1. **Select AI Agent = ReAct + Tools + Memory**
    - ReAct: 추론과 행동의 반복
@@ -3232,7 +3232,7 @@ Select AI Agent를 마스터했다면:
    에이전트 생성 → 팀 구성 → 활성화 → 테스트
    ```
 
-#### Select AI vs Select AI Agent
+###### Select AI vs Select AI Agent
 
 | 항목 | Select AI | Select AI Agent |
 |------|-----------|----------------|
@@ -3242,7 +3242,7 @@ Select AI Agent를 마스터했다면:
 | **상태** | Stateless | Stateful (대화 기억) |
 | **적용** | 데이터 조회 | 업무 자동화, 워크플로우 |
 
-#### 언제 무엇을 사용할까?
+###### 언제 무엇을 사용할까?
 
 **Select AI를 사용:**
 - 단순한 데이터 조회
@@ -3259,7 +3259,7 @@ Select AI Agent를 마스터했다면:
 
 ### 연습 문제
 
-#### 초급: 기본 에이전트 수정
+###### 초급: 기본 에이전트 수정
 
 **문제 1**: 에이전트에게 할인 코드 생성 기능 추가
 - `generate_discount_code(customer_id, discount_percent)` 함수 생성
@@ -3274,7 +3274,7 @@ Select AI Agent를 마스터했다면:
 
 ---
 
-#### 중급: 복합 워크플로우
+###### 중급: 복합 워크플로우
 
 **문제 3**: 재고 알림 시스템
 1. 재고가 10개 이하인 제품을 찾는 SQL Tool
@@ -3289,7 +3289,7 @@ Select AI Agent를 마스터했다면:
 
 ---
 
-#### 고급: 다중 에이전트 협업
+###### 고급: 다중 에이전트 협업
 
 **문제 5**: 3-Agent 시스템 구축
 1. **Data Analyst**: 데이터 분석 전담
@@ -3355,7 +3355,7 @@ Select AI Agent를 마스터했다면:
 
 ### Quick Reference
 
-#### 자주 사용하는 SQL 구문
+###### 자주 사용하는 SQL 구문
 
 ```sql
 -- Agent 실행
@@ -3380,7 +3380,7 @@ SELECT TOOL_NAME, TOOL_TYPE FROM USER_AI_AGENT_TOOLS;
 SELECT TEAM_NAME FROM USER_AI_AGENT_TEAMS;
 ```
 
-#### 자주 사용하는 Python 코드
+###### 자주 사용하는 Python 코드
 
 ```python
 # 기본 호출
@@ -3426,7 +3426,7 @@ cursor.callproc("DBMS_CLOUD_AI.DELETE_CONVERSATION", [conv_id])
 
 ### 유용한 SQL 스니펫 모음
 
-#### 스니펫 1: Agent 상태 종합 대시보드
+###### 스니펫 1: Agent 상태 종합 대시보드
 
 ```sql
 -- ===============================================
@@ -3489,7 +3489,7 @@ ORDER BY USAGE DESC;
 
 ---
 
-#### 스니펫 2: 대화형 SQL*Plus 스크립트
+###### 스니펫 2: 대화형 SQL*Plus 스크립트
 
 ```sql
 -- ===============================================
@@ -3536,7 +3536,7 @@ END;
 
 ---
 
-#### 스니펫 3: 배치 테스트 스크립트
+###### 스니펫 3: 배치 테스트 스크립트
 
 ```sql
 -- ===============================================
@@ -3932,7 +3932,7 @@ python diagnose_agent.py
 
 ### 실전 예제 프로젝트
 
-#### 프로젝트 1: Slack 봇 통합
+###### 프로젝트 1: Slack 봇 통합
 
 파일: `slack_bot.py`
 
@@ -4025,7 +4025,7 @@ if __name__ == "__main__":
 
 ---
 
-#### 프로젝트 2: 비용 모니터링 대시보드
+###### 프로젝트 2: 비용 모니터링 대시보드
 
 파일: `cost_monitor.py`
 
@@ -4103,7 +4103,7 @@ if __name__ == "__main__":
 
 ### 고급 디버깅 기법
 
-#### 디버깅 스크립트: Agent 사고 과정 시각화
+###### 디버깅 스크립트: Agent 사고 과정 시각화
 
 파일: `trace_agent.py`
 
@@ -4215,7 +4215,7 @@ if __name__ == "__main__":
 
 ### 추가 참고 자료
 
-#### 샘플 프로젝트 저장소
+###### 샘플 프로젝트 저장소
 ```
 northwind-agent/
 ├── sql/
@@ -4238,7 +4238,7 @@ northwind-agent/
 └── README.md
 ```
 
-#### requirements.txt
+###### requirements.txt
 
 ```
 oracledb==2.0.0
