@@ -400,7 +400,6 @@ API Key 관리 없이 IAM 권한으로 인증하는 가장 안전한 방식입�
 - DBMS_CLOUD.CREATE_CREDENTIAL로 생성하지 않음
 - OCI 리소스(ADB) 내부에서만 작동
 - Dynamic Group과 Policy가 올바르게 설정되어 있어야 함
-- 로컬 PC에서는 사용 불가 (API Key 방식 사용 필요)
 
 **Case A-2: OCI GenAI (API Key 방식 - Private Key 사용)**
 특정 OCI 사용자 계정의 API Key를 사용하여 인증합니다. 로컬 개발 환경에서 주로 사용됩니다. 
@@ -687,7 +686,8 @@ Python SDK(select_ai)를 활용하여 애플리케이션 레벨에서 Select AI�
   - MacOS / Linux:
 `curl -LsSf https://astral.sh/uv/install.sh | sh`
   - Windows:
-`powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
+`powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex`
+https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/ 설치
 
 - 사용 할 라이브러리 설치
 ```
@@ -1875,8 +1875,7 @@ Cursor는 설정 파일을 통해 MCP 서버를 등록합니다.
 Mac: Cmd + , (커맨드 + 쉼표)
 Windows: Ctrl + ,
 
-**설정 파일 내용 (`cline_mcp_settings.json`):** 설정 화면에서 cline_mcp_settings.json 파일을 찾거나 생성합니다.
-Cmd + P → ~/.cursor/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json 입력
+**설정 파일 내용 (`mcp.json`):** 설정 화면에서 Cmd(Ctrl) + shift + P 입력 후 MCP tool 추가를 선택하고 아래 내요을 입력(directory는 각자 상황에 맞춰야 합니다.)
 
 ```json
 {
@@ -1976,156 +1975,6 @@ print("Debug: Connecting to database...", file=sys.stderr, flush=True)
 print("Debug: Connecting to database...")
 ```
 
-##### 6.3 MCP 서버 코드 구조
-
-실제 작동하는 `mcp_server.py`의 핵심 구조입니다:
-
-```python
-"""
-Oracle Select AI MCP Server
-STDIO 방식으로 Cursor와 통신하는 MCP 서버
-"""
-
-import os
-from dotenv import load_dotenv
-
-# .env 파일에서 환경 변수 로드
-load_dotenv()
-
-# 환경 변수 설정
-WALLET_DIR = os.getenv("WALLET_DIR")
-DB_USER = os.getenv("DB_USER", "NORTHWIND")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_DSN = os.getenv("DB_DSN")
-WALLET_PASSWORD = os.getenv("WALLET_PASSWORD")
-DEFAULT_PROFILE = os.getenv("AI_PROFILE", "NORTHWIND_AI")
-
-# TNS_ADMIN 설정 (반드시 select_ai import 전에)
-os.environ['TNS_ADMIN'] = WALLET_DIR
-
-# FastMCP와 select_ai 임포트
-from fastmcp import FastMCP
-import select_ai
-
-# MCP 서버 생성
-mcp = FastMCP("Oracle Select AI")
-
-# 데이터베이스 연결 함수
-def ensure_connection():
-    """데이터베이스 연결 확인 및 재연결"""
-    try:
-        if not select_ai.is_connected():
-            select_ai.connect(
-                user=DB_USER,
-                password=DB_PASSWORD,
-                dsn=DB_DSN,
-                wallet_location=WALLET_DIR,
-                wallet_password=WALLET_PASSWORD
-            )
-        return True
-    except Exception as e:
-        import sys, traceback
-        # STDERR로 에러 로그 출력 (STDOUT 오염 방지)
-        print(f"❌ Connection error: {e}", file=sys.stderr, flush=True)
-        return False
-
-# MCP Tool 1: 데이터베이스 질의
-@mcp.tool()
-def ask_database(question: str, profile_name: str = DEFAULT_PROFILE) -> str:
-    """
-    자연어로 데이터베이스에 질문하고 결과를 받습니다.
-    
-    Args:
-        question: 자연어 질문 (예: "재고가 가장 많은 제품은?")
-        profile_name: AI 프로파일 이름 (기본값: NORTHWIND_AI)
-    
-    Returns:
-        자연어로 설명된 쿼리 결과
-    """
-    try:
-        if not ensure_connection():
-            return "Error: Could not connect to database"
-        
-        profile = select_ai.Profile(profile_name=profile_name)
-        response = profile.narrate(question)
-        return response
-    except Exception as e:
-        import sys, traceback
-        print(f"❌ [ask_database] {str(e)}", file=sys.stderr, flush=True)
-        return f"Error: {str(e)}"
-
-# MCP Tool 2: SQL 생성
-@mcp.tool()
-def generate_sql(question: str, profile_name: str = DEFAULT_PROFILE) -> str:
-    """
-    자연어를 SQL 쿼리로 변환합니다 (실행하지 않음).
-    
-    Args:
-        question: 자연어 질문
-        profile_name: AI 프로파일 이름
-    
-    Returns:
-        생성된 SQL 쿼리 문자열
-    """
-    try:
-        if not ensure_connection():
-            return "Error: Could not connect to database"
-        
-        profile = select_ai.Profile(profile_name=profile_name)
-        sql = profile.generate(f"showsql {question}")
-        return str(sql)
-    except Exception as e:
-        import sys
-        print(f"❌ [generate_sql] {str(e)}", file=sys.stderr, flush=True)
-        return f"Error: {str(e)}"
-
-# MCP Tool 3: AI 채팅
-@mcp.tool()
-def chat_with_ai(message: str, profile_name: str = DEFAULT_PROFILE) -> str:
-    """
-    데이터베이스에 대한 일반적인 질문에 답변합니다.
-    
-    Args:
-        message: 질문 메시지
-        profile_name: AI 프로파일 이름
-    
-    Returns:
-        AI의 답변
-    """
-    try:
-        if not ensure_connection():
-            return "Error: Could not connect to database"
-        
-        profile = select_ai.Profile(profile_name=profile_name)
-        response = profile.chat(message)
-        return response
-    except Exception as e:
-        import sys
-        print(f"❌ [chat_with_ai] {str(e)}", file=sys.stderr, flush=True)
-        return f"Error: {str(e)}"
-
-# 서버 시작
-if __name__ == "__main__":
-    import sys
-    # STDERR로 시작 로그 출력
-    print("="*80, file=sys.stderr, flush=True)
-    print("Starting Oracle Select AI MCP Server...", file=sys.stderr, flush=True)
-    print(f"✓ Database: {DB_DSN}", file=sys.stderr, flush=True)
-    print(f"✓ Profile: {DEFAULT_PROFILE}", file=sys.stderr, flush=True)
-    print("="*80, file=sys.stderr, flush=True)
-    
-    # STDIO 모드로 MCP 서버 실행
-    mcp.run()
-```
-
-**코드 설명:**
-
-1. **환경 변수 로드**: `.env` 파일에서 DB 접속 정보 로드
-2. **TNS_ADMIN 설정**: Oracle Wallet 경로 설정 (import 전에 필수)
-3. **MCP Tool 데코레이터**: `@mcp.tool()`로 함수를 MCP 도구로 등록
-4. **에러 처리**: 모든 에러는 stderr로 로깅, 사용자에게는 에러 메시지 반환
-5. **STDIO 통신**: `mcp.run()`이 stdin/stdout으로 JSON-RPC 통신 시작
-
 ##### 6.4 로컬 테스트
 
 IDE 연동 전에 로컬에서 MCP 서버를 테스트할 수 있습니다:
@@ -2156,6 +2005,9 @@ Starting Oracle Select AI MCP Server...
 ```
 
 서버가 정상 실행되면 stdin에서 JSON-RPC 메시지를 대기합니다. `Ctrl+C`로 종료할 수 있습니다.
+MCP tool을 서버처럼 직접 실행해서 사용하는 구조는 아니고, Cursor와 같은 MCP 클라이언트 환경이 MCP manifest(tool 선언 정보)를 기반으로 tool discovery를 먼저 수행한 뒤, tool에 정의된 정보를 기반으로 사용자의 요청에 따라 필요하다고 판단한 시점에 stdio 기반 JSON-RPC 포맷의 메시지로 해당 tool을 invoke(호출) 하는 구조입니다.
+이때 모든 요청과 응답은 jsonrpc, id, method, params, result 필드를 가지는 표준 JSON-RPC 2.0 포맷으로 stdin/stdout을 통해 로컬 프로세스 간에 직접 전달됩니다.
+MCP 클라이언트가 선언정보에 따라 직접 호출함으로 미리 실행하지 않아도 됩니다.
 
 ##### 6.5 IDE 채팅창에서 사용
 
