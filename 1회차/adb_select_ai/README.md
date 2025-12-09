@@ -544,7 +544,7 @@ END;
 **프로파일 확인:**
 ```sql
 -- 생성된 프로파일 목록 확인
-SELECT profile_name, status, created_on
+SELECT profile_name, status, created
 FROM user_cloud_ai_profiles;
 
 -- 프로파일 상세 속성 확인
@@ -687,7 +687,7 @@ Python SDK(select_ai)를 활용하여 애플리케이션 레벨에서 Select AI�
 `curl -LsSf https://astral.sh/uv/install.sh | sh`
   - Windows:
 `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex`
-https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/ 설치
+https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/ 설치 "Desktop development with with C++" workload 설치 필요
 
 - 사용 할 라이브러리 설치
 ```
@@ -768,7 +768,7 @@ PL/SQL에서 생성한 프로파일을 Python 객체로 불러와 기본 동작�
 ###### 2.1 기본 연결 및 프로파일 사용
 
 ```python
-iimport os
+import os
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -1864,6 +1864,7 @@ if __name__ == "__main__":
 
 #### 4. 환경 변수 설정
 MCP 서버 실행 전에 필요한 환경 변수를 설정합니다.
+.env 설정이 되어있으면 추가로 할 필요는 없습니다.
 
 #### 5. IDE 연동 설정
 구축한 MCP 서버를 IDE에 등록하여 AI 어시스턴트가 이 도구를 인식하고 사용할 수 있게 합니다.
