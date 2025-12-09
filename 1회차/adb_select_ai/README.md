@@ -2005,6 +2005,7 @@ Starting Oracle Select AI MCP Server...
 ```
 
 서버가 정상 실행되면 stdin에서 JSON-RPC 메시지를 대기합니다. `Ctrl+C`로 종료할 수 있습니다.
+
 MCP tool을 서버처럼 직접 실행해서 사용하는 구조는 아니고, Cursor와 같은 MCP 클라이언트 환경이 MCP manifest(tool 선언 정보)를 기반으로 tool discovery를 먼저 수행한 뒤, tool에 정의된 정보를 기반으로 사용자의 요청에 따라 필요하다고 판단한 시점에 stdio 기반 JSON-RPC 포맷의 메시지로 해당 tool을 invoke(호출) 하는 구조입니다.
 이때 모든 요청과 응답은 jsonrpc, id, method, params, result 필드를 가지는 표준 JSON-RPC 2.0 포맷으로 stdin/stdout을 통해 로컬 프로세스 간에 직접 전달됩니다.
 MCP 클라이언트가 선언정보에 따라 직접 호출함으로 미리 실행하지 않아도 됩니다.
