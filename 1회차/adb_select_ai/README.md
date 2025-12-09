@@ -544,7 +544,7 @@ END;
 **프로파일 확인:**
 ```sql
 -- 생성된 프로파일 목록 확인
-SELECT profile_name, status, created_on
+SELECT profile_name, status, created
 FROM user_cloud_ai_profiles;
 
 -- 프로파일 상세 속성 확인
@@ -687,7 +687,7 @@ Python SDK(select_ai)를 활용하여 애플리케이션 레벨에서 Select AI�
 `curl -LsSf https://astral.sh/uv/install.sh | sh`
   - Windows:
 `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex`
-https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/ 설치
+https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/ 설치 "Desktop development with with C++" workload 설치 필요
 
 - 사용 할 라이브러리 설치
 ```
@@ -768,7 +768,7 @@ PL/SQL에서 생성한 프로파일을 Python 객체로 불러와 기본 동작�
 ###### 2.1 기본 연결 및 프로파일 사용
 
 ```python
-iimport os
+import os
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -1864,6 +1864,7 @@ if __name__ == "__main__":
 
 #### 4. 환경 변수 설정
 MCP 서버 실행 전에 필요한 환경 변수를 설정합니다.
+.env 설정이 되어있으면 추가로 할 필요는 없습니다.
 
 #### 5. IDE 연동 설정
 구축한 MCP 서버를 IDE에 등록하여 AI 어시스턴트가 이 도구를 인식하고 사용할 수 있게 합니다.
@@ -2005,6 +2006,7 @@ Starting Oracle Select AI MCP Server...
 ```
 
 서버가 정상 실행되면 stdin에서 JSON-RPC 메시지를 대기합니다. `Ctrl+C`로 종료할 수 있습니다.
+
 MCP tool을 서버처럼 직접 실행해서 사용하는 구조는 아니고, Cursor와 같은 MCP 클라이언트 환경이 MCP manifest(tool 선언 정보)를 기반으로 tool discovery를 먼저 수행한 뒤, tool에 정의된 정보를 기반으로 사용자의 요청에 따라 필요하다고 판단한 시점에 stdio 기반 JSON-RPC 포맷의 메시지로 해당 tool을 invoke(호출) 하는 구조입니다.
 이때 모든 요청과 응답은 jsonrpc, id, method, params, result 필드를 가지는 표준 JSON-RPC 2.0 포맷으로 stdin/stdout을 통해 로컬 프로세스 간에 직접 전달됩니다.
 MCP 클라이언트가 선언정보에 따라 직접 호출함으로 미리 실행하지 않아도 됩니다.
