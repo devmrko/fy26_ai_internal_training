@@ -4,6 +4,7 @@ Hierarchical team, task, and tool selection with chat interface
 """
 
 import os
+import time
 from dotenv import load_dotenv
 
 # ⚠️ 중요: TNS_ADMIN을 oracledb 임포트 전에 설정해야 함!
@@ -45,22 +46,40 @@ import json
 # DATABASE FUNCTIONS
 # ============================================================================
 
-def connect_to_database():
-    """Connect to Oracle database"""
+@st.cache_resource
+def get_connection_pool():
+    """Create and return a connection pool (cached)"""
     try:
-        conn = oracledb.connect(
+        pool = oracledb.create_pool(
             user=DB_USER,
             password=DB_PASSWORD,
             dsn=DB_DSN,
-            config_dir=WALLET_DIR,
             wallet_location=WALLET_DIR,
-            wallet_password=WALLET_PASSWORD
+            wallet_password=WALLET_PASSWORD,
+            min=2,
+            max=10,
+            increment=1
         )
-        print("✓ 데이터베이스 연결 성공!")
-        return conn, None
+        return pool, None
     except Exception as e:
-        print(f"❌ 연결 실패: {e}")
         return None, str(e)
+
+
+def get_connection():
+    """Get a connection from the pool"""
+    pool, error = get_connection_pool()
+    if error:
+        return None, error
+    try:
+        connection = pool.acquire()
+        return connection, None
+    except Exception as e:
+        return None, str(e)
+
+
+def connect_to_database():
+    """Get a connection from the pool"""
+    return get_connection()
 
 
 @st.cache_data(ttl=60)
@@ -224,13 +243,13 @@ def get_conversation_history():
             SELECT 
                 c.conversation_id,
                 c.conversation_title,
-                CAST(c.created AS DATE) AS created,
+                TO_CHAR(c.created, 'YYYY-MM-DD HH24:MI:SS') AS created,
                 COUNT(p.conversation_prompt_id) AS message_count
             FROM user_cloud_ai_conversations c
             LEFT JOIN user_cloud_ai_conversation_prompts p
                 ON c.conversation_id = p.conversation_id
-            GROUP BY c.conversation_id, c.conversation_title, CAST(c.created AS DATE)
-            ORDER BY CAST(c.created AS DATE) DESC
+            GROUP BY c.conversation_id, c.conversation_title, TO_CHAR(c.created, 'YYYY-MM-DD HH24:MI:SS')
+            ORDER BY TO_CHAR(c.created, 'YYYY-MM-DD HH24:MI:SS') DESC
         """
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -240,7 +259,7 @@ def get_conversation_history():
             conv_data = {
                 'id': str(row[0]),
                 'title': str(row[1]) if row[1] else 'Untitled Conversation',
-                'created': row[2],
+                'created': row[2] if row[2] else '',  # Already a string from TO_CHAR
                 'message_count': int(row[3])
             }
             conversations.append(conv_data)
@@ -254,7 +273,7 @@ def get_conversation_history():
 
 
 def get_conversation_messages(conversation_id):
-    """Get messages from a specific conversation"""
+    """Get messages from a specific conversation with all execution steps"""
     try:
         conn, error = connect_to_database()
         if error:
@@ -265,7 +284,8 @@ def get_conversation_messages(conversation_id):
             SELECT 
                 prompt,
                 prompt_response,
-                CAST(created AS DATE) AS created
+                prompt_action,
+                TO_CHAR(created, 'YYYY-MM-DD HH24:MI:SS') AS created
             FROM user_cloud_ai_conversation_prompts
             WHERE conversation_id = :conv_id
             ORDER BY created ASC
@@ -274,21 +294,59 @@ def get_conversation_messages(conversation_id):
         rows = cursor.fetchall()
         
         messages = []
+        current_prompt = None
+        execution_steps = []
+        
         for row in rows:
-            # User message
-            messages.append({
-                'role': 'user',
-                'content': str(row[0]),
-                'timestamp': row[2]
-            })
-            # Assistant message
+            prompt = str(row[0])
             response = row[1]
             if hasattr(response, 'read'):
                 response = response.read()
+            response = str(response) if response else ''
+            
+            prompt_action = str(row[2]) if row[2] else 'UNKNOWN'
+            timestamp = row[3] if row[3] else ''  # Already a string from TO_CHAR
+            
+            # If this is a new prompt, save previous message and start new one
+            if prompt != current_prompt:
+                # Save previous message if exists
+                if current_prompt is not None and execution_steps:
+                    # Get the final response (usually the last step)
+                    final_response = execution_steps[-1]['response'] if execution_steps else ''
+                    messages.append({
+                        'role': 'assistant',
+                        'content': final_response,
+                        'execution_steps': execution_steps,
+                        'timestamp': execution_steps[0].get('timestamp') if execution_steps else None
+                    })
+                
+                # Add user message for new prompt
+                if prompt:
+                    messages.append({
+                        'role': 'user',
+                        'content': prompt,
+                        'timestamp': timestamp
+                    })
+                
+                # Reset for new message
+                current_prompt = prompt
+                execution_steps = []
+            
+            # Add this execution step
+            execution_steps.append({
+                'action': prompt_action,
+                'response': response,
+                'timestamp': timestamp
+            })
+        
+        # Don't forget the last message
+        if current_prompt is not None and execution_steps:
+            final_response = execution_steps[-1]['response'] if execution_steps else ''
             messages.append({
                 'role': 'assistant',
-                'content': str(response) if response else '',
-                'timestamp': row[2]
+                'content': final_response,
+                'execution_steps': execution_steps,
+                'timestamp': execution_steps[0].get('timestamp') if execution_steps else None
             })
         
         cursor.close()
@@ -300,11 +358,11 @@ def get_conversation_messages(conversation_id):
 
 
 def execute_agent_query(team_name, question, conversation_id=None):
-    """Execute AI Agent query"""
+    """Execute AI Agent query and retrieve detailed thought process"""
     try:
         conn, error = connect_to_database()
         if error:
-            return None, error
+            return None, None, error
         
         cursor = conn.cursor()
         
@@ -346,13 +404,57 @@ def execute_agent_query(team_name, question, conversation_id=None):
         if result:
             result = result.read() if hasattr(result, 'read') else str(result)
         
+        # Small delay to ensure database commits all records
+        time.sleep(0.5)
+        
+        # Query the database to get execution steps for this prompt
+        # Use DBMS_LOB.COMPARE for CLOB comparison
+        detail_query = """
+            SELECT 
+                prompt_action,
+                prompt_response
+            FROM user_cloud_ai_conversation_prompts
+            WHERE conversation_id = :conv_id
+            AND DBMS_LOB.COMPARE(prompt, :user_prompt) = 0
+        """
+        
+        try:
+            cursor.execute(detail_query, conv_id=conversation_id, user_prompt=question)
+            detail_rows = cursor.fetchall()
+            st.info(f"✅ Query successful! Found {len(detail_rows)} execution steps")
+        except Exception as query_error:
+            st.error(f"Detail query failed: {query_error}")
+            st.error(f"Query was: {detail_query}")
+            st.error(f"Params: conv_id={conversation_id}, prompt={question}")
+            raise
+        
+        execution_steps = []
+        
+        for idx, row in enumerate(detail_rows, 1):
+            action_type = str(row[0]) if row[0] else "UNKNOWN"
+            response = row[1]
+            if hasattr(response, 'read'):
+                response = response.read()
+            response = str(response) if response else ''
+            
+            st.info(f"📝 Step {idx}: Action={action_type}, Response length={len(response)}")
+            
+            execution_steps.append({
+                'action': action_type,
+                'response': response,
+                'timestamp': ''  # No timestamp for now
+            })
+        
         cursor.close()
         conn.close()
         
-        return result, conversation_id
+        st.success(f"🎉 Returning {len(execution_steps)} execution steps to UI")
+        
+        # Return all execution steps along with the final result
+        return result, execution_steps, conversation_id
     except Exception as e:
         st.error(f"Query execution failed: {e}")
-        return None, None
+        return None, None, None
 
 
 # ============================================================================
@@ -576,12 +678,87 @@ def setup_sidebar():
 
 def display_chat_history():
     """Display previous chat messages"""
-    for msg in st.session_state.messages:
+    for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             # Display timestamp if available
             if "timestamp" in msg and msg["timestamp"]:
                 st.caption(f"🕒 {msg['timestamp']}")
+            
+            # Display content
             st.markdown(msg["content"])
+            
+            # For assistant messages, show execution steps if available
+            if msg["role"] == "assistant":
+                # Check for execution_steps (new format)
+                if "execution_steps" in msg and msg["execution_steps"]:
+                    execution_steps = msg["execution_steps"]
+                    with st.expander("🔍 View Execution Details", expanded=False):
+                        st.write(f"**Total Steps:** {len(execution_steps)}")
+                        st.divider()
+                        
+                        for step_idx, step in enumerate(execution_steps, 1):
+                            action_type = step['action']
+                            response = step['response']
+                            timestamp = step.get('timestamp', '')
+                            
+                            # Action type emoji
+                            action_emoji = {
+                                "AGENT": "🤖",
+                                "SQL": "🗃️",
+                                "RAG": "📚",
+                                "PLSQL": "⚙️",
+                                "TOOL": "🔧",
+                                "UNKNOWN": "❓"
+                            }.get(action_type, "💬")
+                            
+                            st.subheader(f"{action_emoji} Step {step_idx}: {action_type}")
+                            if timestamp:
+                                st.caption(f"🕒 {timestamp}")
+                            
+                            # Try to parse response as JSON
+                            try:
+                                parsed = json.loads(response)
+                                if isinstance(parsed, dict):
+                                    # Display thought/action/observation if available
+                                    if "thought" in parsed:
+                                        st.write("**💭 Thought:**")
+                                        st.info(parsed["thought"])
+                                    
+                                    if "action" in parsed:
+                                        st.write("**⚡ Action:**")
+                                        st.code(parsed["action"], language="sql")
+                                    
+                                    if "observation" in parsed:
+                                        st.write("**👁️ Observation:**")
+                                        st.success(parsed["observation"])
+                                    
+                                    if "response" in parsed or "answer" in parsed:
+                                        st.write("**📝 Response:**")
+                                        st.markdown(parsed.get("response") or parsed.get("answer"))
+                                    
+                                    # Show full JSON
+                                    with st.expander("📋 Full JSON", expanded=False):
+                                        st.json(parsed)
+                                else:
+                                    st.code(response)
+                            except (json.JSONDecodeError, TypeError):
+                                # Not JSON, display as text
+                                st.text_area("Response:", response, height=150, disabled=True, key=f"hist_msg{idx}_step{step_idx}")
+                            
+                            if step_idx < len(execution_steps):
+                                st.divider()
+                
+                # Check for old format (prompt_action only)
+                elif "prompt_action" in msg:
+                    action_type = msg["prompt_action"]
+                    action_emoji = {
+                        "AGENT": "🤖",
+                        "SQL": "🗃️",
+                        "RAG": "📚",
+                        "UNKNOWN": "❓"
+                    }.get(action_type, "💬")
+                    
+                    st.caption(f"{action_emoji} Action Type: **{action_type}**")
 
 
 def process_user_input(prompt, team_name):
@@ -596,18 +773,87 @@ def process_user_input(prompt, team_name):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             conversation_id = st.session_state.get('conversation_id')
-            result, new_conversation_id = execute_agent_query(team_name, prompt, conversation_id)
+            result, execution_steps, new_conversation_id = execute_agent_query(team_name, prompt, conversation_id)
             
-            if result:
+            if result and execution_steps:
+                # Display main result
                 st.markdown(result)
-                st.session_state.messages.append({"role": "assistant", "content": result})
+                
+                # Show all execution steps
+                if execution_steps:
+                    with st.expander("🔍 View Execution Details", expanded=True):
+                        st.write(f"**Total Steps:** {len(execution_steps)}")
+                        st.divider()
+                        
+                        for idx, step in enumerate(execution_steps, 1):
+                            action_type = step['action']
+                            response = step['response']
+                            timestamp = step.get('timestamp', '')
+                            
+                            # Action type emoji
+                            action_emoji = {
+                                "AGENT": "🤖",
+                                "SQL": "🗃️",
+                                "RAG": "📚",
+                                "PLSQL": "⚙️",
+                                "TOOL": "🔧",
+                                "UNKNOWN": "❓"
+                            }.get(action_type, "💬")
+                            
+                            st.subheader(f"{action_emoji} Step {idx}: {action_type}")
+                            if timestamp:
+                                st.caption(f"🕒 {timestamp}")
+                            
+                            # Try to parse response as JSON
+                            try:
+                                parsed = json.loads(response)
+                                if isinstance(parsed, dict):
+                                    # Display thought/action/observation if available
+                                    if "thought" in parsed:
+                                        st.write("**💭 Thought:**")
+                                        st.info(parsed["thought"])
+                                    
+                                    if "action" in parsed:
+                                        st.write("**⚡ Action:**")
+                                        st.code(parsed["action"], language="sql")
+                                    
+                                    if "observation" in parsed:
+                                        st.write("**👁️ Observation:**")
+                                        st.success(parsed["observation"])
+                                    
+                                    if "response" in parsed or "answer" in parsed:
+                                        st.write("**� Response:**")
+                                        st.markdown(parsed.get("response") or parsed.get("answer"))
+                                    
+                                    # Show full JSON
+                                    with st.expander("📋 Full JSON", expanded=False):
+                                        st.json(parsed)
+                                else:
+                                    st.code(response)
+                            except (json.JSONDecodeError, TypeError):
+                                # Not JSON, display as text
+                                st.text_area("Response:", response, height=150, disabled=True, key=f"step_{idx}")
+                            
+                            if idx < len(execution_steps):
+                                st.divider()
+                
+                # Add to session - store execution steps for later display
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": result,
+                    "execution_steps": execution_steps
+                })
                 
                 if new_conversation_id:
                     st.session_state.conversation_id = new_conversation_id
             else:
                 error_msg = "Failed to get response from AI Agent"
                 st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": error_msg,
+                    "execution_steps": []
+                })
 
 
 # ============================================================================

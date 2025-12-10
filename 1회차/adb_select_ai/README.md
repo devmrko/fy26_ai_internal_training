@@ -1606,6 +1606,8 @@ if __name__ == "__main__":
 터미널에서 다음 명령어를 실행합니다.
 ```
 streamlit run app.py
+or
+uv run streamlit run app.py
 ```
 
 - 결과 확인
