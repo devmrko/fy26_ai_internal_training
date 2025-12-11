@@ -43,27 +43,27 @@
 
 ### [1부] Select AI Agent 개념 및 아키텍처
 
-##### 1. Select AI Agent란 무엇인가?
+#### 1. Select AI Agent란 무엇인가?
 
 **Select AI Agent**는 Oracle Autonomous Database에 내장된 대화형 자율 에이전트 프레임워크입니다. 
 
-###### 핵심 개념
+##### 핵심 개념
 기존 Select AI가 **단일 tool(NL2SQL)**를 사용한 질의응답에 집중했다면, Select AI Agent는 **여러 tool를 조합**하여 사용하고 **ReAct 패턴(Reasoning and Acting)**을 통해 추론과 행동을 반복하며 작업을 완수하는 에이전트 프레임워크입니다.
 
 **주요 차이점:**
 - **Select AI**: 자연어 → SQL 변환 → 결과 반환 (단일 작업)
 - **Select AI Agent**: 추론 → tool 선택 → 실행 → 결과 평가 → 재추론 → ... → 최종 답변 (다단계 작업)
 
-###### 핵심 기능 (Key Features)
+##### 핵심 기능 (Key Features)
 
-###### 1.1 통합 지능 (Integrated Intelligence)
+##### 1.1 통합 지능 (Integrated Intelligence)
 계획, tool 사용, 성찰을 결합하여 에이전트가 작업에 대해 추론하고, tool를 선택 및 실행하며, 결과를 관찰하고, 계획을 조정하여 대화 전반에 걸쳐 응답을 개선합니다.
 
 - 에이전트는 단계를 계획하고, tool를 실행하며, 관찰 결과를 평가합니다
 - 결과가 기대에 미치지 못할 때 접근 방식을 업데이트합니다
 - 이러한 루프는 정확성을 강화하고, 재작업을 줄이며, 대화를 올바른 방향으로 유지합니다
 
-###### 1.2 유연한 tool (Flexible Tooling)
+##### 1.2 유연한 tool (Flexible Tooling)
 내장 RAG 및 NL2SQL, 커스텀 PL/SQL 프로시저, 외부 REST 서비스를 지원하고 사용하며, 오케스트레이션 구성 요소나 별도의 인프라 없이 데이터베이스에 핵심 로직을 유지하면서 필요에 따라 외부 기능을 통합할 수 있습니다.
 
 **지원되는 tool 유형:**
@@ -79,21 +79,21 @@
 **하나의 작업에서 여러 tool를 순차적으로 조합:**
 - SQL Tool로 데이터 조회 → PL/SQL Tool로 처리 → Notification Tool로 결과 알림
 
-###### 1.3 문맥 인식 대화 (Context-Aware Conversations)
+##### 1.3 문맥 인식 대화 (Context-Aware Conversations)
 턴 간 컨텍스트를 유지하고, 응답을 개인화하며, 선호도를 저장하고, 멀티턴 세션 동안 수정 및 확인을 위한 human-in-the-loop 제어를 지원하기 위해 단기 및 장기 메모리를 유지합니다.
 
 - **단기 기억(Short-term memory)**: 현재 대화를 일관성 있게 유지
 - **장기 기억(Long-term memory)**: 선호도와 이전 결과를 기록하여 후속 상호작용 및 인간 검토자의 감독 지원
 - **멀티턴 대화**: 여러 차례의 질문과 답변을 통해 작업 완수
 
-###### 1.4 확장성 및 보안 (Scalable and Secure)
+##### 1.4 확장성 및 보안 (Scalable and Secure)
 Autonomous AI Database 내부에서 실행되어 보안 제어, 감사 및 성능을 상속받고, 데이터 이동을 줄이며, 대규모 엔터프라이즈 배포 및 규제 환경을 위한 거버넌스를 표준화합니다.
 
 - 에이전트는 데이터베이스의 보안, 감사 및 성능 특성을 활용합니다
 - 처리를 데이터에 가깝게 유지하여 이동을 줄이고 거버넌스 관행에 부합합니다
 - 엔터프라이즈 규모의 안정적인 운영
 
-###### 1.5 빠른 개발 (Faster Development)
+##### 1.5 빠른 개발 (Faster Development)
 익숙한 SQL 및 PL/SQL로 에이전트, 작업 및 tool를 정의하고, 기존 프로시저를 재사용하며, 별도의 인프라를 구축하지 않고 운영 데이터 및 팀에 가까운 로직을 유지하면서 기능을 더 빠르게 제공할 수 있습니다.
 
 - SQL/PL/SQL 기반 개발로 진입 장벽 낮음
@@ -102,7 +102,7 @@ Autonomous AI Database 내부에서 실행되어 보안 제어, 감사 및 성�
 
 ---
 
-##### 2. 작동 원리: ReAct 패턴
+#### 2. 작동 원리: ReAct 패턴
 
 Select AI Agent는 **ReAct (Reasoning and Acting)** 패턴을 사용합니다. 이 패턴은 추론(Reasoning)과 행동(Acting)을 루프로 결합하여, 에이전트가 생각하고, tool를 선택하며, 결과를 관찰하고, 확신할 수 있는 답변을 제시할 때까지 반복합니다.
 
@@ -111,7 +111,7 @@ Select AI Agent는 **ReAct (Reasoning and Acting)** 패턴을 사용합니다. �
 - 데이터베이스는 이러한 행동을 처리하고 관찰(Observation) 결과를 반환합니다
 - 에이전트는 각 반복마다 다음 패턴을 따릅니다:
 
-###### ReAct 사이클
+##### ReAct 사이클
 
 **각 반복(iteration)의 패턴:**
 
@@ -139,11 +139,11 @@ Select AI Agent는 **ReAct (Reasoning and Acting)** 패턴을 사용합니다. �
 
 ---
 
-##### 3. 아키텍처 및 구성 요소
+#### 3. 아키텍처 및 구성 요소
 
 Select AI Agent는 작업을 **4개의 계층**으로 구성합니다: Planning, Tool Use, Reflection, Memory Management. 이러한 계층은 추론, tool 실행, 평가 및 멀티턴 상호작용을 위한 컨텍스트를 조정합니다.
 
-#### 4계층 아키텍처
+##### 4계층 아키텍처
 
 | **Layer 1: Planning (계획)** |
 |:---|
@@ -168,11 +168,11 @@ Select AI Agent는 작업을 **4개의 계층**으로 구성합니다: Planning,
 | 에이전트 팀별로 세션 컨텍스트 및 지식을 저장합니다.<br>• 단기 기억: 에이전트 팀별 최근 메시지 및 중간 결과 보유<br>• 장기 기억: 선호도, 이력, 전략을 기록하여 지속성,<br>개인화 및 계획 개선<br>• 세션 간 유용한 지식을 지속하여 시간이 지남에 따라<br>에이전트 팀 전반의 지침 및 응답 품질 향상 |
 
 
-#### 4가지 핵심 객체
+##### 4가지 핵심 객체
 
 Select AI Agent는 다음 4가지 객체의 조합으로 동작합니다:
 
-###### 3.1 Agent (에이전트)
+##### 3.1 Agent (에이전트)
 **정의된 목적을 위해 작업을 수행하는 구성된 작업자**
 
 에이전트는 요청에 대해 추론하고, tool를 선택하며, 단계를 실행하고, 결과를 평가하며, 데이터베이스 컨텍스트에 기반한 응답을 생성합니다.
@@ -184,7 +184,7 @@ Select AI Agent는 다음 4가지 객체의 조합으로 동작합니다:
 
 > **상세 구현은 Step 4 참조**
 
-###### 3.2 Tool (tool)
+##### 3.2 Tool (tool)
 **데이터 업데이트, 문서 검색 또는 외부 서비스 호출과 같은 작업을 수행**
 
 tool는 파라미터를 받아 실행되며, 추론을 위한 관찰(observation) 결과를 반환합니다. tool는 반복 가능한 작업을 캡슐화하고, 부작용을 제어 및 관찰 가능하게 유지하여 감사 및 디버깅을 지원합니다.
@@ -200,7 +200,7 @@ tool는 파라미터를 받아 실행되며, 추론을 위한 관찰(observation
 
 > **상세 구현은 Step 2 참조**
 
-###### 3.3 Task (작업)
+##### 3.3 Task (작업)
 **작업 단위를 나타내며, tool 선택, 파라미터 매핑 및 실행 정책을 안내**
 
 작업은 목표, 입력, tool 선택 및 가드레일을 지정합니다. 다운스트림 단계가 읽고 요약할 수 있는 구조화된 출력을 반환합니다.
@@ -213,7 +213,7 @@ tool는 파라미터를 받아 실행되며, 추론을 위한 관찰(observation
 
 > **상세 구현은 Step 3 참조**
 
-###### 3.4 Agent Team (팀)
+##### 3.4 Agent Team (팀)
 **하나 이상의 에이전트가 에이전트 워크플로우를 수행**
 
 팀은 에이전트-작업 쌍을 실행하여 다단계 상호작업을 안정적으로 완료합니다. 팀은 공유 컨텍스트를 유지하고 통합된 응답을 생성합니다.
@@ -228,7 +228,7 @@ tool는 파라미터를 받아 실행되며, 추론을 위한 관찰(observation
 
 > **상세 구현은 Step 5 참조**
 
-###### 3.5 객체 간 관계도
+##### 3.5 객체 간 관계도
 
 **실행 흐름:**
 ```
@@ -273,15 +273,15 @@ Tools (SQL_Analysis_Tool, EMAIL_NOTIFY)
 
 ---
 
-##### Step 1: 사전 준비 및 권한 설정
+#### Step 1: 사전 준비 및 권한 설정
 
-###### 1.1 필요 권한 확인
+##### 1.1 필요 권한 확인
 
 Select AI Agent를 사용하려면 다음 패키지에 대한 실행 권한이 필요합니다:
 - `DBMS_CLOUD_AI_AGENT` - 에이전트 생성 및 관리
 - `DBMS_CLOUD_AI` - AI 프로파일 사용
 
-###### 1.2 권한 부여 (ADMIN 계정에서 실행)
+##### 1.2 권한 부여 (ADMIN 계정에서 실행)
 
 **중요**: Select AI Agent를 사용하려면 반드시 ADMIN 계정에서 아래 권한을 부여해야 합니다!
 
@@ -301,7 +301,7 @@ GRANT EXECUTE ON C##CLOUD$SERVICE.DBMS_CLOUD_AI TO NORTHWIND; -- 이미 select a
 GRANT EXECUTE ON DBMS_LOB TO NORTHWIND;
 ```
 
-###### 1.3 네트워크 ACL 설정 (선택사항)
+##### 1.3 네트워크 ACL 설정 (선택사항)
 
 외부 API(WebSearch, 이메일 등)를 사용할 경우 네트워크 접근 권한이 필요합니다.
 
@@ -331,13 +331,54 @@ END;
 
 ---
 
-###### 1.3 AI 프로파일 확인
+##### 1.4 Helper Function 생성 (CLOB 응답 처리용)
+
+Agent 실행 시 CLOB 응답을 안정적으로 처리하기 위한 함수를 생성합니다.
+
+```sql
+-- ===============================================
+-- Step 1.4: run_team_clob 함수 생성
+-- 설명: AI Agent 실행 시 CLOB 응답을 AUTONOMOUS_TRANSACTION으로 처리
+-- 실행 계정: NORTHWIND
+-- ===============================================
+
+CREATE OR REPLACE FUNCTION NORTHWIND.run_team_clob (
+    p_team_name   IN VARCHAR2,
+    p_user_prompt IN VARCHAR2,
+    p_params      IN CLOB
+) RETURN CLOB
+AS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    l_answer CLOB;
+BEGIN
+    l_answer := DBMS_CLOUD_AI_AGENT.RUN_TEAM(
+        team_name   => p_team_name,
+        user_prompt => p_user_prompt,
+        params      => p_params
+    );
+
+    -- Commit any internal work so the autonomous transaction ends cleanly
+    COMMIT;
+
+    RETURN l_answer;
+END;
+/
+```
+
+**함수 설명:**
+- `PRAGMA AUTONOMOUS_TRANSACTION`: 독립적인 트랜잭션으로 실행하여 CLOB 처리 안정성 확보
+- AI Agent의 응답을 CLOB 타입으로 반환
+- 멀티턴 대화 시 conversation_id를 params로 전달 가능
+
+---
+
+##### 1.5 AI 프로파일 확인
 
 1회차에서 생성한 `NORTHWIND_AI` 프로파일이 있는지 확인합니다.
 
 ```sql
 -- ===============================================
--- Step 1.4: AI 프로파일 확인
+-- Step 1.5: AI 프로파일 확인
 -- 설명: Select AI Agent가 사용할 LLM 프로파일 확인
 -- 실행 계정: NORTHWIND
 -- ===============================================
@@ -358,11 +399,11 @@ ORDER BY p.profile_name, a.attribute_name;
 
 ---
 
-##### Step 2: tool(Tool) 생성
+#### Step 2: tool(Tool) 생성
 
 에이전트가 사용할 **tool**을 만듭니다. tool는 에이전트가 실제로 작업을 수행하는 수단입니다.
 
-###### 2.1 SQL Tool 생성 (데이터 조회용)
+##### 2.1 SQL Tool 생성 (데이터 조회용)
 
 **목적**: 자연어 질문을 SQL 쿼리로 변환하여 데이터베이스를 조회하는 tool
 
@@ -423,13 +464,13 @@ ORDER  BY t.tool_name, a.attribute_name;
 
 ---
 
-###### 2.2 PL/SQL Tool 생성 (반품 처리 로직)
+##### 2.2 PL/SQL Tool 생성 (반품 처리 로직)
 
 **목적**: 실제 비즈니스 로직을 수행하는 tool (RMA 번호 생성)
 
 **배경**: SQL Tool은 **조회**만 가능합니다. 데이터를 생성하거나 복잡한 로직을 실행하려면 PL/SQL 함수가 필요합니다.
 
-##### 2.2.1 비즈니스 로직 함수 생성
+###### 2.2.1 비즈니스 로직 함수 생성
 ```sql
 -- 반품 테이블 생성
 CREATE TABLE returns (
@@ -503,7 +544,7 @@ END;
 select * from returns;
 ```
 
-##### 2.2.2 함수를 Agent Tool로 등록
+###### 2.2.2 함수를 Agent Tool로 등록
 
 ```sql
 -- ===============================================
@@ -555,7 +596,7 @@ ORDER BY t.tool_name, a.attribute_name;
 
 ---
 
-###### 2.3 생성된 tool 확인
+##### 2.3 생성된 tool 확인
 
 ```sql
 -- ===============================================
@@ -654,11 +695,11 @@ GROUP BY TOOL_NAME;
 
 ---
 
-##### Step 3: 작업(Task) 생성
+#### Step 3: 작업(Task) 생성
 
 **Task**는 에이전트의 **업무 매뉴얼**입니다. 무엇을 하고, 어떻게 할지를 구체적으로 정의합니다.
 
-###### 3.1 Task 개념 이해
+##### 3.1 Task 개념 이해
 
 **Task는 다음을 포함합니다:**
 1. **Instruction (지침)**: 에이전트가 따라야 할 규칙과 절차
@@ -672,7 +713,7 @@ GROUP BY TOOL_NAME;
 | **[사용 가능 tool]**<br>✓ SQL_Analysis_Tool<br>✓ Return_Auth_Generator<br>✓ EMAIL_NOTIFY<br>✓ Human_Tool (자동 활성화) |
 
 
-###### 3.2 Task 생성
+##### 3.2 Task 생성
 
 ```sql
 -- ===============================================
@@ -720,7 +761,7 @@ END;
 - **시나리오별로**: 상황에 따른 행동 지침을 명확히 (WORKFLOW 섹션)
 - **예외 처리**: 정보가 부족할 때 어떻게 할지 명시
 
-###### 3.3 enable_human_tool 이해
+##### 3.3 enable_human_tool 이해
 
 **정의**: 작업 중 정보나 명확한 설명이 필요할 때 에이전트가 사용자에게 질문할 수 있도록 활성화합니다.
 
@@ -744,7 +785,7 @@ END;
   → 더 이상 진행 불가, 작업 실패 또는 불완전한 결과
 ```
 
-###### 3.4 Task 확인
+##### 3.4 Task 확인
 
 ```sql
 -- Task에 연결된 tool 목록 확인
@@ -762,11 +803,11 @@ ORDER BY t.owner, t.task_name;
 
 ---
 
-##### Step 4: 에이전트(Agent) 생성
+#### Step 4: 에이전트(Agent) 생성
 
 **Agent**는 실제로 작업을 수행하는 **주체**입니다. 에이전트에게 성격과 전문성을 부여합니다.
 
-###### 4.1 Agent 속성 (CREATE_AGENT Attributes)
+##### 4.1 Agent 속성 (CREATE_AGENT Attributes)
 
 에이전트의 속성은 역할과 AI 프로파일 이름을 정의합니다.
 
@@ -780,7 +821,7 @@ ORDER BY t.owner, t.task_name;
 - **enable_human_tool**: 기본값 `true`
   - 정보나 명확한 설명을 위해 에이전트가 사용자에게 질문할 수 있도록 활성화
 
-###### 4.2 Agent 생성
+##### 4.2 Agent 생성
 
 ```sql
 -- ===============================================
@@ -817,7 +858,7 @@ END;
 "role": "helpful assistant"  너무 모호함
 ```
 
-###### 4.3 Agent 확인
+##### 4.3 Agent 확인
 
 ```sql
 -- Agent 목록 조회
@@ -831,13 +872,13 @@ WHERE AGENT_NAME = upper('Northwind_Support_Bot');
 
 ---
 
-##### Step 5: 팀(Team) 구성 및 활성화
+#### Step 5: 팀(Team) 구성 및 활성화
 
 **Team**은 에이전트와 작업을 **연결**하는 최종 단계입니다. 팀을 활성화해야 에이전트를 사용할 수 있습니다.
 
-###### 5.1 Team 개념
+##### 5.1 Team 개념
 
-###### 5.2 Team 생성
+##### 5.2 Team 생성
 
 ```sql
 -- ===============================================
@@ -873,7 +914,7 @@ END;
 
 **참고**: 현재는 에이전트 1개만 사용하지만, 향후 여러 전문 에이전트를 협업시킬 수 있습니다.
 
-###### 5.3 팀 활성화 (중요!)
+##### 5.3 팀 활성화 (중요!)
 
 **현재 세션에 팀을 활성화**해야 사용할 수 있습니다.
 
@@ -899,7 +940,7 @@ Northwind_Support_Team
 
 **중요**: `SET_TEAM`은 **세션 단위**로 적용됩니다. 새로운 SQL 세션을 열면 다시 설정해야 합니다.
 
-###### 5.4 Team 확인
+##### 5.4 Team 확인
 
 ```sql
 -- ===============================================
@@ -941,11 +982,11 @@ ORDER BY t.owner, t.agent_team_name;
 
 ---
 
-##### Step 6: 에이전트 실행 및 테스트
+#### Step 6: 에이전트 실행 및 테스트
 
 드디어 에이전트를 사용할 시간입니다! `SELECT AI AGENT` 구문으로 자연어로 대화합니다.
 
-###### 6.2 테스트 케이스 1: 단순 데이터 조회
+##### 6.1 테스트 케이스 1: 단순 데이터 조회
 
 **목적**: SQL Tool이 제대로 작동하는지 확인
 
@@ -996,7 +1037,7 @@ END;
 
 ---
 
-###### 6.3 테스트 케이스 2: 복합 추론 (Multi-turn)
+##### 6.2 테스트 케이스 2: 복합 추론 (Multi-turn)
 
 **목적**: 에이전트가 여러 단계의 추론을 거쳐 작업을 완수하는지 확인
 
@@ -1063,13 +1104,13 @@ ORDER BY p.CREATED ASC;
 
 ---
 
-###### 6.6 에이전트 사고 과정 확인
+##### 6.3 에이전트 사고 과정 확인
 
 에이전트가 어떤 추론(Thought) 과정을 거쳤는지 확인할 수 있습니다.
 
 ```sql
 -- ===============================================
--- Step 6.6: 에이전트 실행 히스토리 및 사고 과정 조회
+-- Step 6.3: 에이전트 실행 히스토리 및 사고 과정 조회
 -- 뷰: USER_CLOUD_AI_CONVERSATION_PROMPTS
 -- 목적: AI Agent 호출 내역 추적, 디버깅, 감사
 -- ===============================================
@@ -1125,11 +1166,11 @@ ORDER BY CREATED DESC;
 
 ---
 
-##### Step 7: 고급 Tool - RAG, WebSearch, Notification
+#### Step 7: 고급 Tool - RAG, WebSearch, Notification
 
 Select AI Agent는 SQL/PL/SQL 외에도 다양한 내장 tool를 지원합니다.
 
-###### 7.1 RAG Tool (문서 검색)
+##### 7.1 RAG Tool (문서 검색)
 
 **사용 사례**: 제품 매뉴얼, FAQ, 정책 문서 검색
 
@@ -1196,7 +1237,7 @@ END;
 /
 ```
 
-###### 7.2 WebSearch Tool (인터넷 검색)
+##### 7.2 WebSearch Tool (인터넷 검색)
 
 **사용 사례**: 최신 정보, 환율, 경쟁사 정보 조회, openai를 사용해서 호출해야 함
 
@@ -1284,7 +1325,7 @@ END;
 ```
 
 
-###### 7.3 Notification Tool (이메일/Slack)
+##### 7.3 Notification Tool (이메일/Slack)
 
 **사용 사례**: 주문 확인 이메일, 재고 부족 알림
 
