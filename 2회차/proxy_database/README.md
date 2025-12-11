@@ -316,7 +316,7 @@ CREATE OR REPLACE VIEW view_rds_orders AS SELECT * FROM "ecommerce_poc"."orders"
 CREATE OR REPLACE VIEW view_rds_products AS SELECT * FROM "ecommerce_poc"."products"@RDS_LINK;
 
 COMMENT ON TABLE view_rds_customers IS 'Stores customer profiles and demographic information';
-COMMENT ON COLUMN view_rds_customers.region IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
+COMMENT ON COLUMN view_rds_customers."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
 
 ```
 
