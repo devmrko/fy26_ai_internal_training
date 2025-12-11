@@ -299,6 +299,11 @@ GRANT EXECUTE ON C##CLOUD$SERVICE.DBMS_CLOUD_AI TO NORTHWIND; -- 이미 select a
 -- 2. LOB 데이터 처리 권한 (AI Agent 응답 처리용)
 -- 설명: AI Agent의 CLOB 응답을 읽고 처리하기 위해 필요
 GRANT EXECUTE ON DBMS_LOB TO NORTHWIND;
+
+-- 3. Agent 메타데이터 조회 권한
+-- 설명: AI Agent Task 정보를 조회하기 위해 필요
+GRANT SELECT ON DBA_AI_AGENT_TASKS TO NORTHWIND;
+GRANT SELECT ON DBA_AI_AGENT_TASK_ATTRIBUTES TO NORTHWIND;
 ```
 
 ##### 1.3 네트워크 ACL 설정 (선택사항)

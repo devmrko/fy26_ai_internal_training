@@ -2,13 +2,8 @@
 
 ## 목차
 1. [Select AI 아키텍처와 "Sidecar" 모델](#1-select-ai-아키텍처와-sidecar-모델)
-2. [대화형 AI (Conversations) 및 문맥 유지](#2-대화형-ai-conversations-및-문맥-유지)
-3. [메타데이터 보강을 통한 정확도 향상](#3-메타데이터-보강을-통한-정확도-향상)
-4. [Select AI with RAG (검색 증강 생성)](#4-select-ai-with-rag-검색-증강-생성)
-5. [보안 및 거버넌스: Real Application Security (RAS)](#5-보안-및-거버넌스-real-application-security-ras)
-6. [엔터프라이즈 통합 및 확장](#6-엔터프라이즈-통합-및-확장)
-7. [핸즈온 실습 가이드](#7-핸즈온-실습-가이드)
-8. [DBMS_CLOUD_AI 패키지 핵심 레퍼런스](#8-dbms_cloud_ai-패키지-핵심-레퍼런스)
+2. [메타데이터 보강을 통한 정확도 향상](#2-메타데이터-보강을-통한-정확도-향상)
+3. [엔터프라이즈 통합 및 확장](#3-엔터프라이즈-통합-및-확장)
 
 ---
 
@@ -92,6 +87,7 @@ Select AI는 다음과 같은 다양한 데이터 소스를 지원합니다:
 
 **Select AI 방식:**
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 사용자는 단순히 질문만 하면 됩니다
 SELECT DBMS_CLOUD_AI.GENERATE(
   prompt => '지난 주 가장 많이 팔린 제품과 그 제품에 대한 평균 리뷰 점수를 보여줘',
@@ -107,9 +103,9 @@ Select AI가 자동으로:
 
 ---
 
-## 3. 메타데이터 보강을 통한 정확도 향상
+## 2. 메타데이터 보강을 통한 정확도 향상
 
-### 3.1 LLM의 환각 방지와 Comments의 역할
+### 2.1 LLM의 환각 방지와 Comments의 역할
 
 #### 문제 상황: 모호한 스키마
 
@@ -140,11 +136,11 @@ TABLE2
 
 ---
 
-## 6. 엔터프라이즈 통합 및 확장
+## 3. 엔터프라이즈 통합 및 확장
 
-### 6.2 MySQL Database 연결 핸즈온
+### 3.1 MySQL Database 연결 핸즈온
 
-#### 6.2.1 MySQL 연결 개요
+#### 3.1.1 MySQL 연결 개요
 
 **사용 사례:**
 - 레거시 애플리케이션이 MySQL에 데이터 저장
@@ -153,7 +149,7 @@ TABLE2
 
 ---
 
-#### 6.2.2 사전 준비: MySQL 서버 설정
+#### 3.1.2 사전 준비: MySQL 서버 설정
 
 이 섹션의 SQL 스크립트는 MySQL community Edition에서 작동합니다.
 
@@ -238,7 +234,7 @@ INSERT INTO orders (customer_id, total_amount, status, order_date) VALUES
    - RDS 인스턴스의 "Publicly accessible" 옵션 활성화
    - 엔드포인트 확인: `your-instance.xxxxx.us-east-1.rds.amazonaws.com`
 
-#### 6.2.3 ADB에서 MySQL 연결 설정
+#### 3.1.3 ADB에서 MySQL 연결 설정
 
 **Step 1: MySQL JDBC Driver 확인**
 
@@ -273,8 +269,8 @@ GRANT EXECUTE ON DBMS_CLOUD_ADMIN TO NORTHWIND;
 **Step 3: MySQL 연결 Credential 생성**
 
 ```sql
--- MySQL 접속 정보를 저장하는 Credential 생성
 -- NORTHWIND 사용자로 실행:
+-- MySQL 접속 정보를 저장하는 Credential 생성
 BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'AWS_RDS_CRED',
@@ -289,6 +285,7 @@ END;
 **Step 4: Database Link 생성**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- MySQL 데이터베이스로의 Database Link 생성
 BEGIN
   DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
@@ -307,6 +304,7 @@ END;
 **Step 5: 연결 테스트**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 1. Customers 테이블 조회
 SELECT * FROM "ecommerce_poc"."customers"@RDS_LINK
 WHERE ROWNUM <= 5;
@@ -320,13 +318,14 @@ COMMENT ON COLUMN view_rds_customers."region" IS 'Geographic region of the custo
 
 ```
 
-#### 6.2.4 Select AI 프로파일 생성 (MySQL 포함)
+#### 3.1.4 Select AI 프로파일 생성 (MySQL 포함)
 
 **선택사항: ADB의 로컬 테이블 준비 (연합 쿼리 테스트용)**
 
 MySQL에 이미 customers 테이블이 있지만, 연합 쿼리 데모를 위해 ADB에 추가 정보를 저장할 수 있습니다.
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- ADB에 고객 등급 정보 테이블 생성 (Oracle에 저장)
 CREATE TABLE customer_tiers (
   customer_id NUMBER PRIMARY KEY,
@@ -360,6 +359,7 @@ SELECT * FROM customer_tiers;
 **MySQL 테이블을 포함한 AI 프로파일 생성**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
       profile_name => 'AWS_RDS_AI_PROFILE',
@@ -390,17 +390,19 @@ MySQL에서 설정한 COMMENT는 Database Link를 통해 Select AI가 자동으�
 
 **확인:**
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- MySQL COMMENT가 잘 전달되는지 확인
 EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_RDS_AI_PROFILE');
 select ai 'orders 테이블의 status 컬럼에 가능한 값들은?';
 
 ```
 
-#### 6.2.5 연합 쿼리 실습
+#### 3.1.5 연합 쿼리 실습
 
 **질문 1: MySQL 테이블만 조회 (SELECT AI 사용)**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 재고 확인
 EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_RDS_AI_PROFILE');
 SELECT AI '재고가 50개 이하인 제품을 보여줘';
@@ -409,6 +411,7 @@ SELECT AI '재고가 50개 이하인 제품을 보여줘';
 **질문 3: Oracle + MySQL 연합 쿼리 (customer_tiers 포함)**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- Gold 등급 고객의 주문 분석
 
 EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_RDS_AI_PROFILE');
@@ -419,6 +422,7 @@ SELECT AI 'Gold 등급 고객들의 총 주문 금액은?';
 **질문 5: 시계열 분석**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 월별 매출 추이
 SELECT AI 월별 총 매출액을 보여줘;
 
@@ -426,11 +430,12 @@ SELECT AI 월별 총 매출액을 보여줘;
 SELECT AI 월별 신규 가입 고객 수는?;
 ```
 
-#### 6.2.6 성능 최적화
+#### 3.1.6 성능 최적화
 
 **원격 테이블 캐싱**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 자주 조회되는 MySQL 테이블을 ADB에 캐시
 CREATE MATERIALIZED VIEW products_cache
 BUILD IMMEDIATE
@@ -466,9 +471,9 @@ END;
 
 ---
 
-### 6.3 PostgreSQL Database 연결 (MySQL Community Edition 대안) ✅
+### 3.2 PostgreSQL Database 연결 (MySQL Community Edition 대안) ✅
 
-#### 6.3.1 PostgreSQL을 사용하는 이유
+#### 3.2.1 PostgreSQL을 사용하는 이유
 
 **🎯 이 섹션의 목표:**
 - AWS RDS PostgreSQL 인스턴스 설정
@@ -478,7 +483,7 @@ END;
 
 ---
 
-#### 6.3.2 PostgreSQL 데이터베이스 준비
+#### 3.2.2 PostgreSQL 데이터베이스 준비
 
 **AWS RDS PostgreSQL 인스턴스 생성**
 
@@ -591,7 +596,7 @@ AWS Console에서:
 
 ---
 
-#### 6.3.3 ADB에서 PostgreSQL 연결 설정
+#### 3.2.3 ADB에서 PostgreSQL 연결 설정
 
 **Step 1: 사용자 권한 부여 (ADMIN 권한 필요)**
 
@@ -620,6 +625,7 @@ END;
 **Step 3: PostgreSQL Database Link 생성**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 BEGIN
   DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
     db_link_name       => 'RDS_POSTGRES_LINK',
@@ -639,6 +645,7 @@ END;
 **Step 4: 연결 테스트 (⚠️ 중요: 대소문자 이슈!)**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 SELECT * FROM "public"."customers"@RDS_POSTGRES_LINK;
 
 -- 데이터 개수 확인
@@ -649,11 +656,12 @@ SELECT COUNT(*) FROM "public"."orders"@RDS_POSTGRES_LINK;
 
 ---
 
-#### 6.3.4 View 생성
+#### 3.2.4 View 생성
 
 **Step 1: Local View 생성**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 1. Customers View
 CREATE OR REPLACE VIEW view_customers AS 
 SELECT * FROM "public"."customers"@RDS_POSTGRES_LINK;
@@ -671,6 +679,7 @@ SELECT * FROM "public"."orders"@RDS_POSTGRES_LINK;
 **Step 2: Local View에 COMMENT 추가 (Select AI에 필수!)**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- Customers View 주석
 COMMENT ON TABLE view_customers IS 
 'Stores customer profiles and demographic information';
@@ -715,11 +724,12 @@ COMMENT ON COLUMN view_orders.status IS
 
 ---
 
-#### 6.3.5 Select AI 프로파일 생성
+#### 3.2.5 Select AI 프로파일 생성
 
 **Step 1: AI 프로파일 생성 (View 사용)**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 기존 프로파일 삭제 (있다면)
 BEGIN
   DBMS_CLOUD_AI.DROP_PROFILE('AWS_POSTGRES_AI_PROFILE', force => TRUE);
@@ -751,11 +761,12 @@ EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_POSTGRES_AI_PROFILE');
 
 ---
 
-#### 6.3.6 Select AI 쿼리 실행
+#### 3.2.6 Select AI 쿼리 실행
 
 **기본 쿼리:**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 총 고객 수
 EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_POSTGRES_AI_PROFILE');
 SELECT AI show me the total number of customers;
@@ -763,9 +774,9 @@ SELECT AI show me the total number of customers;
 
 ---
 
-### 6.4 Apache Iceberg 테이블 쿼리 핸즈온
+### 3.3 Apache Iceberg 테이블 쿼리 핸즈온
 
-#### 6.4.1 Iceberg 개요
+#### 3.3.1 Iceberg 개요
 
 Select AI는 데이터 레이크의 표준 포맷인 Apache Iceberg 테이블에 대한 쿼리를 지원합니다.
 
@@ -776,7 +787,7 @@ Select AI는 데이터 레이크의 표준 포맷인 Apache Iceberg 테이블에
 - 타임 트래블 (Time Travel) 쿼리
 - AWS S3, Azure ADLS, GCS 등 다양한 스토리지 지원
 
-#### 6.4.2 Iceberg의 핵심 장점: 스키마 자동 감지
+#### 3.3.2 Iceberg의 핵심 장점: 스키마 자동 감지
 
 **Iceberg 다른점?**
 
@@ -788,7 +799,7 @@ Select AI는 데이터 레이크의 표준 포맷인 Apache Iceberg 테이블에
 
 **결과:** External Table 생성 시 **컬럼을 일일이 정의할 필요가 없습니다!**
 
-#### 6.4.3 Iceberg 지원 모델
+#### 3.3.3 Iceberg 지원 모델
 
 Select AI는 두 가지 방식으로 Iceberg 테이블을 지원합니다:
 
@@ -804,11 +815,12 @@ Select AI는 두 가지 방식으로 Iceberg 테이블을 지원합니다:
 - **스키마 진화(Schema Evolution) 제한** - 스키마가 변경되면 External Table 재생성 필요
 - **Time Travel 미지원** - 특정 스냅샷, 버전, 타임스탬프로 쿼리 불가
 
-#### 6.4.4 방법 1: AWS Glue Catalog를 사용한 Iceberg 연결
+#### 3.3.4 방법 1: AWS Glue Catalog를 사용한 Iceberg 연결
 
 **Step 1: AWS Glue 접근을 위한 Credential 생성**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- AWS Access Key 방식
 BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
@@ -822,6 +834,7 @@ END;
 ```
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 BEGIN
   DBMS_CLOUD.CREATE_EXTERNAL_TABLE (
     table_name       => 'YELLOW_TRIPDATA_ICEBERG_EXT',
@@ -865,7 +878,8 @@ GRANT READ, WRITE ON DIRECTORY DATA_PUMP_DIR TO NORTHWIND;
 - ADMIN 계정으로 ADB를 사용한다면 이미 권한이 있으므로 불필요
 - 별도 사용자 계정(예: NORTHWIND)을 생성한 경우 반드시 필요
 
-
+```sql
+-- NORTHWIND 사용자로 실행:
 -- 스키마가 자동으로 생성되었는지 확인
 DESC YELLOW_TRIPDATA_ICEBERG_EXT;
 
@@ -881,6 +895,7 @@ SELECT * FROM YELLOW_TRIPDATA_ICEBERG_EXT WHERE ROWNUM <= 10;
 External Table 대신 VIEW를 생성하여 comment 정보를 추가/보강할 수 있습니다.
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- 방법 1: External Table을 먼저 생성한 후 View 생성
 CREATE OR REPLACE VIEW NYC_TAXI_VIEW AS
 SELECT 
@@ -971,11 +986,12 @@ SELECT COUNT(*) as total_trips FROM NYC_TAXI_VIEW;
 
 ```
 
-#### 6.4.8 Select AI with Iceberg
+#### 3.3.5 Select AI with Iceberg
 
 **Iceberg 테이블을 포함한 프로파일 생성**
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
     profile_name => 'SIDECAR_AI_PROFILE',
@@ -997,6 +1013,7 @@ END;
 NYC Yellow Taxi 데이터를 Select AI로 분석하는 예제입니다.
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 BEGIN
     DBMS_CLOUD_AI.SET_PROFILE(profile_name => 'SIDECAR_AI_PROFILE');
 END;
@@ -1009,6 +1026,7 @@ SELECT ai '신용카드로 결제된 건들의 평균 팁 금액을 알려줘';
 프로파일을 활성화한 후, `SELECT AI` 키워드로 더 간단하게 질문할 수 있습니다:
 
 ```sql
+-- NORTHWIND 사용자로 실행:
 -- SELECT AI 구문 사용 예제 (더 간편함!)
 
 -- 기본 분석
