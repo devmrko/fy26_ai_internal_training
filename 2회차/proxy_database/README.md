@@ -313,8 +313,25 @@ CREATE OR REPLACE VIEW view_rds_customers AS SELECT * FROM "ecommerce_poc"."cust
 CREATE OR REPLACE VIEW view_rds_orders AS SELECT * FROM "ecommerce_poc"."orders"@RDS_LINK;
 CREATE OR REPLACE VIEW view_rds_products AS SELECT * FROM "ecommerce_poc"."products"@RDS_LINK;
 
-COMMENT ON TABLE view_rds_customers IS 'Stores customer profiles and demographic information';
-COMMENT ON COLUMN view_rds_customers."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
+COMMENT ON TABLE "view_rds_customers" IS 'Stores customer profiles and demographic information';
+COMMENT ON COLUMN "view_rds_customers"."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
+COMMENT ON COLUMN "view_rds_customers"."customer_id" IS 'Unique identifier for the customer';
+COMMENT ON COLUMN "view_rds_customers"."full_name" IS 'The first and last name of the customer';
+COMMENT ON COLUMN "view_rds_customers"."email" IS 'Customer email address used for login and notifications';
+
+COMMENT ON TABLE "view_rds_products" IS 'Catalog of available items for sale with pricing and inventory status';
+COMMENT ON COLUMN "view_rds_products"."product_id" IS 'Unique identifier for the product';
+COMMENT ON COLUMN "view_rds_products"."product_name" IS 'Commercial name of the product';
+COMMENT ON COLUMN "view_rds_products"."category" IS 'Product category: Electronics, Clothing, Home, or Sports';
+COMMENT ON COLUMN "view_rds_products"."price" IS 'Unit price of the product in USD';
+COMMENT ON COLUMN "view_rds_products"."stock_quantity" IS 'Current inventory level. If 0, product is out of stock';
+
+COMMENT ON TABLE "view_rds_orders" IS 'Transaction history headers. Use this to calculate revenue or sales volume';
+COMMENT ON COLUMN "view_rds_orders"."order_id" IS 'Unique identifier for the order transaction';
+COMMENT ON COLUMN "view_rds_orders"."customer_id" IS 'Foreign key to the customers table';
+COMMENT ON COLUMN "view_rds_orders"."order_date" IS 'Timestamp when the order was placed';
+COMMENT ON COLUMN "view_rds_orders"."total_amount" IS 'Total value of the order in USD including tax';
+COMMENT ON COLUMN "view_rds_orders"."status" IS 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
 
 ```
 
@@ -681,43 +698,43 @@ SELECT * FROM "public"."orders"@RDS_POSTGRES_LINK;
 ```sql
 -- NORTHWIND 사용자로 실행:
 -- Customers View 주석
-COMMENT ON TABLE view_customers IS 
+COMMENT ON TABLE "view_customers" IS 
 'Stores customer profiles and demographic information';
-COMMENT ON COLUMN view_customers.customer_id IS 
+COMMENT ON COLUMN "view_customers"."customer_id" IS 
 'Unique identifier for the customer';
-COMMENT ON COLUMN view_customers.full_name IS 
+COMMENT ON COLUMN "view_customers"."full_name" IS 
 'The first and last name of the customer';
-COMMENT ON COLUMN view_customers.email IS 
+COMMENT ON COLUMN "view_customers"."email" IS 
 'Customer email address used for login and notifications';
-COMMENT ON COLUMN view_customers.region IS 
+COMMENT ON COLUMN "view_customers"."region" IS 
 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
 
 -- Products View 주석
-COMMENT ON TABLE view_products IS 
+COMMENT ON TABLE "view_products" IS 
 'Catalog of available items for sale with pricing and inventory status';
-COMMENT ON COLUMN view_products.product_id IS 
+COMMENT ON COLUMN "view_products"."product_id" IS 
 'Unique identifier for the product';
-COMMENT ON COLUMN view_products.product_name IS 
+COMMENT ON COLUMN "view_products"."product_name" IS 
 'Commercial name of the product';
-COMMENT ON COLUMN view_products.category IS 
+COMMENT ON COLUMN "view_products"."category" IS 
 'Product category: Electronics, Clothing, Home, or Sports';
-COMMENT ON COLUMN view_products.price IS 
+COMMENT ON COLUMN "view_products"."price" IS 
 'Unit price of the product in USD';
-COMMENT ON COLUMN view_products.stock_quantity IS 
+COMMENT ON COLUMN "view_products"."stock_quantity" IS 
 'Current inventory level. If 0, product is out of stock';
 
 -- Orders View 주석
-COMMENT ON TABLE view_orders IS 
+COMMENT ON TABLE "view_orders" IS 
 'Transaction history headers. Use this to calculate revenue or sales volume';
-COMMENT ON COLUMN view_orders.order_id IS 
+COMMENT ON COLUMN "view_orders"."order_id" IS 
 'Unique identifier for the order transaction';
-COMMENT ON COLUMN view_orders.customer_id IS 
+COMMENT ON COLUMN "view_orders"."customer_id" IS 
 'Foreign key to the customers table';
-COMMENT ON COLUMN view_orders.order_date IS 
+COMMENT ON COLUMN "view_orders"."order_date" IS 
 'Timestamp when the order was placed';
-COMMENT ON COLUMN view_orders.total_amount IS 
+COMMENT ON COLUMN "view_orders"."total_amount" IS 
 'Total value of the order in USD including tax';
-COMMENT ON COLUMN view_orders.status IS 
+COMMENT ON COLUMN "view_orders"."status" IS 
 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
 
 ```
