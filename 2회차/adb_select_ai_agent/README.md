@@ -1143,19 +1143,19 @@ FROM DBMS_CLOUD.LIST_OBJECTS(
 );
 /
 
+
 BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
       profile_name => 'EMBED_PROFILE',
       attributes   => '{
           "provider": "oci",
-          "credential_name": "GENAI_CRED", 
+          "credential_name": "OCI_KEY_CRED", 
           "embedding_model": "cohere.embed-v4.0"
       }'
   );
 END;
 /
 
--- 현재 안됨...
 BEGIN
   DBMS_CLOUD_AI.CREATE_VECTOR_INDEX(
     index_name => 'RAG_INDEX',
@@ -1164,26 +1164,28 @@ BEGIN
         "location": "https://swiftobjectstorage.us-chicago-1.oraclecloud.com/v1/apackrsct01/AIDP_OS",
         "object_storage_credential_name": "OCI_KEY_CRED",
         "profile_name": "EMBED_PROFILE",
-        "vector_dimension": 1024,
+        "vector_dimension": 1536,
         "vector_distance_metric": "cosine",
         "chunk_overlap": 128,
         "chunk_size": 1024
     }'
   );
 END;
+/
 
 BEGIN
 DBMS_CLOUD_AI.CREATE_PROFILE(
     profile_name => 'RAG_PROFILE',
-    attributes =>'{"provider": "oci",Confidential- Oracle Internal
+    attributes =>'{"provider": "oci",
         "credential_name": "OCI_KEY_CRED",
         "vector_index_name": "RAG_INDEX",
-        "oci_compartment_id": "ocid1.compartment.oc1..aaaaa...",
+        "oci_compartment_id": "ocid1.compartment.oc1..aaaaaaaam3amapwxz6nyciqzb2v2iwg66t22g47vabo5ilnghbsskooeop3q",
         "temperature": 0.2,
         "max_tokens": 3000
     }');
 END;
 /
+
 BEGIN
 DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
     tool_name => 'RAG_TOOL',
