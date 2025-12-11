@@ -180,7 +180,7 @@ def sql_only_mode(question, profile_name):
                     df = execute_sql(sql)
                     if df is not None:
                         st.success(f"✅ {len(df)} rows returned")
-                        st.dataframe(df, use_container_width=True)
+                        st.dataframe(df, width='stretch')
             
             return {"content": "**Generated SQL:**", "sql": sql}
         else:
@@ -209,7 +209,7 @@ def runsql_mode(question, profile_name, show_sql, show_table):
             st.markdown(f"**Results: {len(df)} rows**")
             
             if show_table:
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, width='stretch')
             else:
                 st.write(df)
             
@@ -311,7 +311,7 @@ def setup_sidebar():
         
         # Clear history
         st.divider()
-        if st.button("🔄 Clear History", use_container_width=True):
+        if st.button("🔄 Clear History", width='stretch'):
             st.session_state.messages = []
             st.rerun()
         
@@ -333,7 +333,7 @@ def display_chat_history(show_sql, show_table):
                 if show_table and "dataframe" in msg:
                     df = msg.get("dataframe")
                     if df is not None and isinstance(df, pd.DataFrame):
-                        st.dataframe(df, use_container_width=True)
+                        st.dataframe(df, width='stretch')
                 
                 # Display content
                 if "content" in msg and msg.get("content"):

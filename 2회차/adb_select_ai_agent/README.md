@@ -960,8 +960,7 @@ DECLARE
     l_team_cov_id varchar2(4000);
 BEGIN
     l_team_cov_id := DBMS_CLOUD_AI.create_conversation();
-    my_globals.l_team_cov_id := l_team_cov_id;
-    DBMS_OUTPUT.PUT_LINE('Created conversation with ID: ' || my_globals.l_team_cov_id);
+   DBMS_OUTPUT.PUT_LINE('Created conversation with ID: ' || l_team_cov_id);
 END;
 /
 

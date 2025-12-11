@@ -42,6 +42,7 @@ import pandas as pd
 import oracledb
 import select_ai
 import json
+import re
 
 # ============================================================================
 # DATABASE FUNCTIONS
@@ -154,7 +155,7 @@ def get_last_sql_id():
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT sql_id, sql_text, TO_CHAR(translation_timestamp, 'YYYY-MM-DD HH24:MI:SS') as ts
+            SELECT sql_id, sql_text, TO_CHAR(translation_timestamp, 'YYYY-MM-DD HH24:MI:SS') as ts, MAPPED_SQL_FULLTEXT
             FROM v$mapped_sql
             WHERE sql_text LIKE '%SELECT AI%'
             ORDER BY translation_timestamp DESC
@@ -166,7 +167,13 @@ def get_last_sql_id():
         db_pool.release(conn)
         
         if result:
-            return {'sql_id': result[0], 'sql_text': result[1], 'timestamp': result[2]}
+            # Convert LOB to string if needed
+            nl_query_raw = result[3]
+            if nl_query_raw is not None and hasattr(nl_query_raw, 'read'):
+                nl_query_raw = nl_query_raw.read()
+            # Extract just the NL query part from SELECT AI statement
+            nl_query = extract_nl_query_from_select_ai(nl_query_raw)
+            return {'sql_id': result[0], 'sql_text': result[1], 'timestamp': result[2], 'nl_query': nl_query}
         return None
     except Exception as e:
         print(f"⚠️ Could not get SQL ID: {e}")
@@ -179,7 +186,7 @@ def get_recent_sql_queries(limit=10):
         cursor = conn.cursor()
         
         cursor.execute(f"""
-            SELECT sql_id, sql_text, TO_CHAR(translation_timestamp, 'YYYY-MM-DD HH24:MI:SS') as ts
+            SELECT sql_id, sql_text, TO_CHAR(translation_timestamp, 'YYYY-MM-DD HH24:MI:SS') as ts, MAPPED_SQL_FULLTEXT
             FROM v$mapped_sql
             WHERE sql_text LIKE '%SELECT AI%'
             ORDER BY translation_timestamp DESC
@@ -190,23 +197,55 @@ def get_recent_sql_queries(limit=10):
         cursor.close()
         db_pool.release(conn)
         
-        return results
+        # Convert LOB objects to strings for Streamlit compatibility
+        processed_results = []
+        for row in results:
+            processed_row = list(row)
+            # Convert MAPPED_SQL_FULLTEXT (4th column) LOB to string
+            if len(processed_row) > 3 and processed_row[3] is not None:
+                if hasattr(processed_row[3], 'read'):
+                    processed_row[3] = processed_row[3].read()
+            processed_results.append(tuple(processed_row))
+        
+        return processed_results
     except Exception as e:
         print(f"⚠️ Could not get SQL queries: {e}")
         return []
 
+def extract_nl_query_from_select_ai(full_text):
+    """Extract the natural language query from SELECT AI statement"""
+    if not full_text:
+        return ""
+    
+    # If it's already a SELECT AI statement, extract the NL query
+    if "SELECT AI" in full_text.upper():
+        # Pattern: SELECT AI ... 'natural language query' ...
+        # Match content between first set of quotes after SELECT AI
+        match = re.search(r"SELECT\s+AI.*?'([^']+)'", full_text, re.IGNORECASE | re.DOTALL)
+        if match:
+            return match.group(1)
+    
+    # Otherwise return as-is (user may have edited it)
+    return full_text
+
 def submit_feedback(profile_name, sql_id, feedback_type, correct_sql, feedback_content):
-    """Submit feedback for Select AI query"""
+    """Submit feedback for Select AI query using DBMS_CLOUD_AI.FEEDBACK"""
     conn = db_pool.acquire()
     cursor = conn.cursor()
     
     try:
-        # Escape single quotes
-        safe_sql = correct_sql.replace("'", "''")
+        # Clean and escape the SQL - strip any surrounding quotes first
+        clean_sql = correct_sql.strip()
+        if clean_sql.startswith("'") and clean_sql.endswith("'"):
+            clean_sql = clean_sql[1:-1]
+        
+        # Escape single quotes for PL/SQL
+        safe_sql = clean_sql.replace("'", "''")
         safe_content = feedback_content.replace("'", "''")
         
         plsql = f"""
         BEGIN
+            DBMS_OUTPUT.ENABLE(buffer_size => NULL);
             DBMS_CLOUD_AI.FEEDBACK(
                 profile_name     => '{profile_name}',
                 sql_id           => '{sql_id}',
@@ -228,10 +267,16 @@ def submit_feedback(profile_name, sql_id, feedback_type, correct_sql, feedback_c
         db_pool.release(conn)
         return True
     except Exception as e:
-        print(f"❌ Error submitting feedback: {e}")
+        error_msg = str(e)
+        print(f"❌ Error submitting feedback: {error_msg}")
         conn.rollback()
         cursor.close()
         db_pool.release(conn)
+        
+        # Check if it's the "not supported" error
+        if "ORA-20000" in error_msg and "not supported" in error_msg:
+            raise Exception("DBMS_CLOUD_AI.FEEDBACK is not supported in this database version. "
+                          "Please check your Oracle database version and ensure Select AI feedback is enabled.")
         raise e
 
 @st.cache_data(ttl=300)
@@ -916,19 +961,23 @@ def setup_sidebar():
                 # Create a DataFrame for display
                 df_queries = pd.DataFrame(
                     recent_queries,
-                    columns=['SQL ID', 'SQL Text', 'Timestamp']
+                    columns=['SQL ID', 'SQL Text', 'Timestamp', 'Original Query']
                 )
                 
                 # Show in a table
                 st.markdown("**Recent SELECT AI Queries:**")
                 st.dataframe(
                     df_queries,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     column_config={
                         "SQL Text": st.column_config.TextColumn(
                             "SQL Text",
                             width="large",
+                        ),
+                        "Original Query": st.column_config.TextColumn(
+                            "Original Query",
+                            width="medium",
                         )
                     }
                 )
@@ -948,6 +997,13 @@ def setup_sidebar():
                     sql_id = selected_query[0]
                     sql_text = selected_query[1]
                     timestamp = selected_query[2]
+                    nl_query_raw = selected_query[3] if len(selected_query) > 3 else "N/A"
+                    
+                    # Extract just the NL query part from SELECT AI statement
+                    nl_query = extract_nl_query_from_select_ai(nl_query_raw)
+                    
+                    # Show original NL query
+                    st.info(f"**Original Question:** {nl_query}")
                     
                     st.code(sql_text, language="sql")
                     st.caption(f"SQL ID: {sql_id} | Executed: {timestamp}")
@@ -963,10 +1019,10 @@ def setup_sidebar():
                         )
                         
                         corrected_sql = st.text_area(
-                            "Corrected SQL (for negative feedback)",
+                            "Corrected SQL",
                             value=sql_text,
                             height=150,
-                            help="Edit the SQL to show the correct version"
+                            help="For NEGATIVE: Edit to show the correct SQL. For POSITIVE: Keep as-is to confirm this SQL is correct."
                         )
                         
                         feedback_content = st.text_area(
@@ -976,7 +1032,7 @@ def setup_sidebar():
                             height=100
                         )
                         
-                        submitted = st.form_submit_button("✅ Submit Feedback", use_container_width=True)
+                        submitted = st.form_submit_button("✅ Submit Feedback", width='stretch')
                         
                         if submitted:
                             if not feedback_content.strip():
