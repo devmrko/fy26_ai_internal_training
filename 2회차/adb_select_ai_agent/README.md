@@ -820,6 +820,17 @@ LEFT JOIN dba_ai_agent_task_attributes a
 WHERE t.TASK_NAME = upper('Customer_Service_Task')
 GROUP BY t.owner, t.task_name, t.status
 ORDER BY t.owner, t.task_name;
+
+-- admin 계정 외 접속 권한에서 Task 확인(정성일 부장님 도움으로 추가)
+SELECT T.TASK_NAME,
+       T.STATUS,
+       JSON_OBJECTAGG(A.ATTRIBUTE_NAME VALUE DBMS_LOB.SUBSTR(A.ATTRIBUTE_VALUE, 4000, 1)) AS TASK_CONFIG
+FROM   USER_AI_AGENT_TASKS T
+LEFT JOIN USER_AI_AGENT_TASK_ATTRIBUTES A
+       ON T.TASK_ID = A.TASK_ID
+WHERE T.TASK_NAME = UPPER('CUSTOMER_SERVICE_TASK')
+GROUP BY T.TASK_NAME, T.STATUS
+ORDER BY T.TASK_NAME;
 ```
 
 ---
@@ -942,6 +953,14 @@ END;
 
 **현재 세션에 팀을 활성화**해야 사용할 수 있습니다.
 
+**참고**: tool에 따라 다르게 실행해야 합니다.(이동희 부장님 도움으로 추가)
+- SQL Action
+  - SELECT AI 구문 단독 실행시 오류 발생
+  - DBMS_CLOUD_AI.SET_PROFILE과 함께 2문장 같이 실행시 오류 안남
+- SQL Developer
+  - DBMS_CLOUD_AI.SET_PROFILE 지정이후
+  - SELECT AI 구문 단독 실행해도 오류안남
+
 ```sql
 -- ===============================================
 -- Step 5.2: Team 활성화
@@ -988,20 +1007,19 @@ WHERE t.AGENT_TEAM_NAME = upper('Northwind_Support_Team')
 GROUP BY t.owner, t.agent_team_name, t.status
 ORDER BY t.owner, t.agent_team_name;
 
--- Team 상세 정보 (에이전트-작업 매핑), table 권한 필요
-SELECT t.owner,
-       t.agent_team_name,
-       t.status,
+-- admin 계정 외 접속 권한에서 Team 확인(정성일 부장님 도움으로 추가)
+SELECT T.AGENT_TEAM_NAME,
+       T.STATUS,
        JSON_OBJECTAGG(
-         a.attribute_name
-         VALUE DBMS_LOB.SUBSTR(a.attribute_value, 4000, 1)
-       ) AS team_config
-FROM   dba_ai_agent_teams t
-LEFT JOIN dba_ai_agent_team_attributes a
-       ON t.owner           = a.owner
-      AND t.agent_team_name = a.agent_team_name
-GROUP BY t.owner, t.agent_team_name, t.status
-ORDER BY t.owner, t.agent_team_name;
+         A.ATTRIBUTE_NAME
+         VALUE DBMS_LOB.SUBSTR(A.ATTRIBUTE_VALUE, 4000, 1)
+       ) AS TEAM_CONFIG
+FROM   USER_AI_AGENT_TEAMS T
+LEFT JOIN USER_AI_AGENT_TEAM_ATTRIBUTES A
+       ON T.AGENT_TEAM_NAME = A.AGENT_TEAM_NAME
+WHERE T.AGENT_TEAM_NAME = UPPER('NORTHWIND_SUPPORT_TEAM')
+GROUP BY T.AGENT_TEAM_NAME, T.STATUS
+ORDER BY T.AGENT_TEAM_NAME;
 
 ```
 
