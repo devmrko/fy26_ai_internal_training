@@ -641,7 +641,9 @@ SELECT
 FROM "NORTHWIND"."PRODUCTS" p 
 ORDER BY p."UNITS_IN_STOCK" DESC FETCH FIRST 1 ROW ONLY
 ```
-2. 피드백 등록 (PL/SQL) DBMS_CLOUD_AI.ADD_FEEDBACK을 사용하여 올바른 계산식을 알려줍니다.
+2. 피드백 등록 (PL/SQL) DBMS_CLOUD_AI.FEEDBACK을 사용하여 올바른 계산식을 알려줍니다.
+
+- 
 ```
 -- 실행한 sql_id 검색
 SELECT sql_id, sql_text, translation_timestamp
