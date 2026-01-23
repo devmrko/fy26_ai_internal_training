@@ -1334,7 +1334,7 @@ END;
 
 BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
-    profile_name => 'OPENAI_WORKING',
+    profile_name => 'WEBSEARCH_PROFILE',
     attributes => '{
       "provider": "openai",
       "credential_name": "OPENAI_CRED",
