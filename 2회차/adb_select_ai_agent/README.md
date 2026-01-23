@@ -1333,6 +1333,20 @@ END;
 /
 
 BEGIN
+  DBMS_CLOUD_AI.CREATE_PROFILE(
+    profile_name => 'OPENAI_WORKING',
+    attributes => '{
+      "provider": "openai",
+      "credential_name": "OPENAI_CRED",
+      "model": "gpt-4",
+      "object_list": [
+       {"owner": "' || USER || '"}
+      ]
+    }'
+  );
+END;
+
+BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_AGENT(
     agent_name => 'A_WEB_SEARCHER',
     profile_name => 'WEBSEARCH_PROFILE',
