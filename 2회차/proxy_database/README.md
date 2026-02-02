@@ -309,29 +309,29 @@ END;
 SELECT * FROM "ecommerce_poc"."customers"@RDS_LINK
 WHERE ROWNUM <= 5;
 
-CREATE OR REPLACE VIEW view_rds_customers AS SELECT * FROM "ecommerce_poc"."customers"@RDS_LINK;
-CREATE OR REPLACE VIEW view_rds_orders AS SELECT * FROM "ecommerce_poc"."orders"@RDS_LINK;
-CREATE OR REPLACE VIEW view_rds_products AS SELECT * FROM "ecommerce_poc"."products"@RDS_LINK;
+CREATE OR REPLACE VIEW VIEW_RDS_CUSTOMERS AS SELECT * FROM "ecommerce_poc"."customers"@RDS_LINK;
+CREATE OR REPLACE VIEW VIEW_RDS_ORDERS AS SELECT * FROM "ecommerce_poc"."orders"@RDS_LINK;
+CREATE OR REPLACE VIEW VIEW_RDS_PRODUCTS AS SELECT * FROM "ecommerce_poc"."products"@RDS_LINK;
 
-COMMENT ON TABLE "view_rds_customers" IS 'Stores customer profiles and demographic information';
-COMMENT ON COLUMN "view_rds_customers"."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
-COMMENT ON COLUMN "view_rds_customers"."customer_id" IS 'Unique identifier for the customer';
-COMMENT ON COLUMN "view_rds_customers"."full_name" IS 'The first and last name of the customer';
-COMMENT ON COLUMN "view_rds_customers"."email" IS 'Customer email address used for login and notifications';
+COMMENT ON TABLE "VIEW_RDS_CUSTOMERS" IS 'Stores customer profiles and demographic information';
+COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
+COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."customer_id" IS 'Unique identifier for the customer';
+COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."full_name" IS 'The first and last name of the customer';
+COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."email" IS 'Customer email address used for login and notifications';
 
-COMMENT ON TABLE "view_rds_products" IS 'Catalog of available items for sale with pricing and inventory status';
-COMMENT ON COLUMN "view_rds_products"."product_id" IS 'Unique identifier for the product';
-COMMENT ON COLUMN "view_rds_products"."product_name" IS 'Commercial name of the product';
-COMMENT ON COLUMN "view_rds_products"."category" IS 'Product category: Electronics, Clothing, Home, or Sports';
-COMMENT ON COLUMN "view_rds_products"."price" IS 'Unit price of the product in USD';
-COMMENT ON COLUMN "view_rds_products"."stock_quantity" IS 'Current inventory level. If 0, product is out of stock';
+COMMENT ON TABLE "VIEW_RDS_PRODUCTS" IS 'Catalog of available items for sale with pricing and inventory status';
+COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."product_id" IS 'Unique identifier for the product';
+COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."product_name" IS 'Commercial name of the product';
+COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."category" IS 'Product category: Electronics, Clothing, Home, or Sports';
+COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."price" IS 'Unit price of the product in USD';
+COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."stock_quantity" IS 'Current inventory level. If 0, product is out of stock';
 
-COMMENT ON TABLE "view_rds_orders" IS 'Transaction history headers. Use this to calculate revenue or sales volume';
-COMMENT ON COLUMN "view_rds_orders"."order_id" IS 'Unique identifier for the order transaction';
-COMMENT ON COLUMN "view_rds_orders"."customer_id" IS 'Foreign key to the customers table';
-COMMENT ON COLUMN "view_rds_orders"."order_date" IS 'Timestamp when the order was placed';
-COMMENT ON COLUMN "view_rds_orders"."total_amount" IS 'Total value of the order in USD including tax';
-COMMENT ON COLUMN "view_rds_orders"."status" IS 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
+COMMENT ON TABLE "VIEW_RDS_ORDERS" IS 'Transaction history headers. Use this to calculate revenue or sales volume';
+COMMENT ON COLUMN "VIEW_RDS_ORDERS"."order_id" IS 'Unique identifier for the order transaction';
+COMMENT ON COLUMN "VIEW_RDS_ORDERS"."customer_id" IS 'Foreign key to the customers table';
+COMMENT ON COLUMN "VIEW_RDS_ORDERS"."order_date" IS 'Timestamp when the order was placed';
+COMMENT ON COLUMN "VIEW_RDS_ORDERS"."total_amount" IS 'Total value of the order in USD including tax';
+COMMENT ON COLUMN "VIEW_RDS_ORDERS"."status" IS 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
 
 ```
 
@@ -384,9 +384,9 @@ BEGIN
                         "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
                         "credential_name": "OCI_KEY_CRED",
                         "object_list": [
-                            {"owner": "NORTHWIND", "name": "view_rds_customers"},
-                            {"owner": "NORTHWIND", "name": "view_rds_orders"},
-                            {"owner": "NORTHWIND", "name": "view_rds_products"},
+                            {"owner": "NORTHWIND", "name": "VIEW_RDS_CUSTOMERS"},
+                            {"owner": "NORTHWIND", "name": "VIEW_RDS_ORDERS"},
+                            {"owner": "NORTHWIND", "name": "VIEW_RDS_PRODUCTS"},
                             {"owner": "NORTHWIND", "name": "customer_tiers"}
                         ]}'
   );
@@ -469,8 +469,8 @@ BEGIN
                         "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
                         "credential_name": "OCI_KEY_CRED",
                         "object_list": [
-                            {"owner": "NORTHWIND", "name": "view_rds_customers"},
-                            {"owner": "NORTHWIND", "name": "view_rds_orders"},
+                            {"owner": "NORTHWIND", "name": "VIEW_RDS_CUSTOMERS"},
+                            {"owner": "NORTHWIND", "name": "VIEW_RDS_ORDERS"},
                             {"owner": "NORTHWIND", "name": "products_cache"},
                             {"owner": "NORTHWIND", "name": "customer_tiers"}
                         ]}'
