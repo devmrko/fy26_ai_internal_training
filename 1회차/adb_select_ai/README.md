@@ -625,7 +625,7 @@ SELECT * FROM products;
 ###### 5.2 Feedback (피드백 제공)
 - LLM이 생성한 SQL이 부정확할 경우, 사용자가 올바른 SQL이나 힌트를 제공하여 AI를 학습시킬 수 있습니다.
 
-- 시나리오: 사용자가 "총 매출"을 물어봤을 때 AI가 Freight(운임)까지 포함하여 계산했다고 가정합니다. 이를 수정하는 피드백을 제공합니다.
+- 시나리오: 사용자가 "재고가 가장 많은 제품 이름 1개"를 물어봤을 때, 복잡한 SQL 코드를 작성했다고 가정합니다. 
 
   1. 부정확한 질문 실행 및 SQL ID 확인
 ```
@@ -642,8 +642,7 @@ FROM "NORTHWIND"."PRODUCTS" p
 ORDER BY p."UNITS_IN_STOCK" DESC FETCH FIRST 1 ROW ONLY
 ```
 2. 피드백 등록 (PL/SQL) DBMS_CLOUD_AI.FEEDBACK을 사용하여 올바른 계산식을 알려줍니다.
-
-- 
+- v$mapped_sql ( AI 전용 테이블 뷰)에서 가장 최근에 번역된 5개 SQL_id 를 조회합니다.
 ```
 -- 실행한 sql_id 검색
 SELECT sql_id, sql_text, translation_timestamp
@@ -1889,7 +1888,7 @@ Cursor는 설정 파일을 통해 MCP 서버를 등록합니다.
 Mac: Cmd + , (커맨드 + 쉼표)
 Windows: Ctrl + ,
 
-**설정 파일 내용 (`mcp.json`):** 설정 화면에서 Cmd(Ctrl) + shift + P 입력 후 MCP tool 추가를 선택하고 아래 내요을 입력(directory는 각자 상황에 맞춰야 합니다.)
+**설정 파일 내용 (`mcp.json`):** 설정 화면에서 Cmd(Ctrl) + shift + P 입력 후 MCP tool 추가를 선택하고 아래 내용을 입력(directory는 각자 상황에 맞춰야 합니다.)
 
 ```json
 {
