@@ -89,7 +89,7 @@ def ask_database(
     
     Args:
         question: Natural language question about the data
-        profile_name: AI profile to use (default: NORTHWIND_AI3)
+        profile_name: AI profile to use (default: NORTHWIND_AI)
     
     Returns:
         Natural language explanation of the query results
@@ -127,7 +127,7 @@ def generate_sql(
     
     Args:
         question: Natural language description of what you want to query
-        profile_name: AI profile to use (default: NORTHWIND_AI3)
+        profile_name: AI profile to use (default: NORTHWIND_AI)
     
     Returns:
         SQL query as a string
@@ -166,7 +166,7 @@ def chat_with_ai(
     
     Args:
         message: Your question or message
-        profile_name: AI profile to use (default: NORTHWIND_AI3)
+        profile_name: AI profile to use (default: NORTHWIND_AI)
     
     Returns:
         AI's response

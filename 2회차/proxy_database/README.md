@@ -1,9 +1,40 @@
 # Oracle Autonomous AI Database: Select AI 심화 - Sidecar & Heterogeneous(이기종) Database Connectivity 핸즈온 가이드
 
+## 문서 개요
+본 교육은 Oracle ADB의 Select AI를 **이기종 데이터베이스 통합** 시나리오로 확장합니다. MySQL, PostgreSQL, Apache Iceberg 등 외부 데이터 소스를 Database Link로 연결하고, 자연어로 연합 쿼리(Federated Query)를 실행하는 방법을 실습합니다.
+
+### 대상 독자
+- 1회차 Select AI 교육을 완료한 수강생 (NORTHWIND 스키마 및 AI 프로파일 생성 완료)
+- 여러 DB에 흩어진 데이터를 통합 분석해야 하는 개발자/분석가
+- 외부 DB 연결이 처음인 분도 따라할 수 있도록 단계별로 안내합니다
+
+### 실습 흐름 요약
+```
+[1장] 개념 이해 (Sidecar 모델) → [2장] 메타데이터 보강 → [3장] 실전 연결 핸즈온
+                                                            ├── 3.1 MySQL
+                                                            ├── 3.2 PostgreSQL
+                                                            └── 3.3 Apache Iceberg
+```
+> **전제 조건**: 1회차에서 생성한 NORTHWIND 사용자, AI 프로파일(`NORTHWIND_AI`), OCI Credential이 필요합니다.
+
+### 프로젝트 파일 구조
+```
+proxy_database/
+├── README.md              # 본 교육 문서 (현재 파일)
+├── .env.example           # 환경 변수 템플릿 (복사하여 .env 생성)
+├── .env                   # 실제 환경 변수 (git에 포함되지 않음)
+└── app.py                 # Streamlit 기반 Select AI 챗봇 (Python, 선택 실습)
+```
+
 ## 목차
 1. [Select AI 아키텍처와 "Sidecar" 모델](#1-select-ai-아키텍처와-sidecar-모델)
 2. [메타데이터 보강을 통한 정확도 향상](#2-메타데이터-보강을-통한-정확도-향상)
 3. [엔터프라이즈 통합 및 확장](#3-엔터프라이즈-통합-및-확장)
+   - 3.1 MySQL Database 연결 핸즈온
+   - 3.2 PostgreSQL Database 연결
+   - 3.3 Apache Iceberg 테이블 쿼리
+4. [부록: Python Streamlit 앱 실행 가이드](#부록-python-streamlit-앱-실행-가이드)
+5. [부록: 트러블슈팅](#부록-트러블슈팅)
 
 ---
 
@@ -21,7 +52,7 @@
 
 ### 1.1 Sidecar(사이드카) 개념 및 필요성
 
-**비즈니스 문제:** 기존에 여러 디비로 나눠저 있어 데이터에 대한 통합 접근이나 AI 활용을 위해 매번 ETL이나 데이터 요청이나 해야 하는 번거로움이 있었습니다.
+**비즈니스 문제:** 기존에 여러 DB로 나뉘어 있어 데이터에 대한 통합 접근이나 AI 활용을 위해 매번 ETL이나 데이터 요청이나 해야 하는 번거로움이 있었습니다.
 
 **해결책:** Select AI는 **"AI Sidecar"** 모델을 통해 흩어져 있는 데이터 베이스를 통합하여 AI에 활용하도록 도와줍니다.
 
@@ -274,8 +305,8 @@ GRANT EXECUTE ON DBMS_CLOUD_ADMIN TO NORTHWIND;
 BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'AWS_RDS_CRED',
-    username        => 'admin',          -- Your AWS Master Username
-    password        => '' -- Your AWS Master Password
+    username        => 'admin',              -- 본인의 AWS RDS Master Username으로 교체
+    password        => 'your-password-here' -- 본인의 AWS RDS Master Password로 교체
   );
 END;
 /
@@ -290,7 +321,7 @@ END;
 BEGIN
   DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
     db_link_name => 'RDS_LINK',
-    hostname     => 'database-1.czaaygccsncp.ap-northeast-2.rds.amazonaws.com',
+    hostname     => 'your-rds-endpoint.region.rds.amazonaws.com',  -- 본인의 RDS 엔드포인트로 교체
     port         => 3306,
     service_name => '',
     credential_name => 'AWS_RDS_CRED',
@@ -401,7 +432,7 @@ EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_RDS_AI_PROFILE');
 **💡 중요: MySQL COMMENT 자동 활용**
 
 MySQL에서 설정한 COMMENT는 Database Link를 통해 Select AI가 자동으로 읽어옵니다:
-- ✅ `comments => 'true'` 설정만 하면 됨
+- ✅ AI 프로파일의 `"comments": true` 속성이 설정되어 있으면 됨
 - ✅ MySQL의 테이블/컬럼 COMMENT가 LLM 프롬프트에 포함됨
 - ✅ 추가 설정 불필요!
 
@@ -416,7 +447,7 @@ select ai 'orders 테이블의 status 컬럼에 가능한 값들은?';
 
 #### 3.1.5 연합 쿼리 실습
 
-**질문 1: MySQL 테이블만 조회 (SELECT AI 사용)**
+**예제 1: MySQL 테이블만 조회 (SELECT AI 사용)**
 
 ```sql
 -- NORTHWIND 사용자로 실행:
@@ -425,7 +456,7 @@ EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_RDS_AI_PROFILE');
 SELECT AI '재고가 50개 이하인 제품을 보여줘';
 ```
 
-**질문 3: Oracle + MySQL 연합 쿼리 (customer_tiers 포함)**
+**예제 2: Oracle + MySQL 연합 쿼리 (customer_tiers 포함)**
 
 ```sql
 -- NORTHWIND 사용자로 실행:
@@ -436,15 +467,18 @@ SELECT AI 'Gold 등급 고객들의 총 주문 금액은?';
 
 ```
 
-**질문 5: 시계열 분석**
+**예제 3: 시계열 분석**
 
 ```sql
 -- NORTHWIND 사용자로 실행:
+-- 프로파일 활성화 (이전 예제에서 이미 SET_PROFILE을 실행했다면 생략 가능)
+EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_RDS_AI_PROFILE');
+
 -- 월별 매출 추이
-SELECT AI 월별 총 매출액을 보여줘;
+SELECT AI '월별 총 매출액을 보여줘';
 
 -- 고객 가입 추이
-SELECT AI 월별 신규 가입 고객 수는?;
+SELECT AI '월별 신규 가입 고객 수는?';
 ```
 
 #### 3.1.6 성능 최적화
@@ -631,8 +665,8 @@ GRANT EXECUTE ON DBMS_CLOUD_ADMIN TO NORTHWIND;
 BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'AWS_RDS_POSTGRES_CRED',
-    username        => 'postgres',          -- AWS RDS Master Username
-    password        => ''   -- AWS RDS Master Password
+    username        => 'postgres',              -- 본인의 AWS RDS Master Username으로 교체
+    password        => 'your-password-here'   -- 본인의 AWS RDS Master Password로 교체
   );
 END;
 /
@@ -646,13 +680,13 @@ END;
 BEGIN
   DBMS_CLOUD_ADMIN.CREATE_DATABASE_LINK(
     db_link_name       => 'RDS_POSTGRES_LINK',
-    hostname           => 'database-2.czaaygccsncp.ap-northeast-2.rds.amazonaws.com', -- Your RDS Endpoint
-    port               => '5432',                -- PostgreSQL Default Port
+    hostname           => 'your-postgres-endpoint.region.rds.amazonaws.com', -- 본인의 RDS PostgreSQL 엔드포인트로 교체
+    port               => 5432,                   -- PostgreSQL Default Port
     service_name       => 'postgres',            -- The PostgreSQL Database Name
     credential_name    => 'AWS_RDS_POSTGRES_CRED',
     ssl_server_cert_dn => NULL,                  -- Usually NULL for standard RDS
     private_target     => FALSE,
-    gateway_params     => JSON_OBJECT('db_type' value 'POSTGRES')
+    gateway_params     => JSON_OBJECT('db_type' value 'postgres')
   );
 END;
 /
@@ -786,7 +820,7 @@ EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_POSTGRES_AI_PROFILE');
 -- NORTHWIND 사용자로 실행:
 -- 총 고객 수
 EXEC DBMS_CLOUD_AI.SET_PROFILE('AWS_POSTGRES_AI_PROFILE');
-SELECT AI show me the total number of customers;
+SELECT AI 'show me the total number of customers';
 ```
 
 ---
@@ -842,8 +876,8 @@ Select AI는 두 가지 방식으로 Iceberg 테이블을 지원합니다:
 BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'AWS_GLUE_CRED',
-    username => 'AKIAIOSFODNN7EXAMPLE',  -- AWS Access Key ID
-    password => ''  -- AWS Secret Key
+    username => 'YOUR_AWS_ACCESS_KEY_ID',     -- 본인의 AWS Access Key ID로 교체
+    password => 'YOUR_AWS_SECRET_ACCESS_KEY' -- 본인의 AWS Secret Access Key로 교체
   );
 END;
 /
@@ -855,7 +889,7 @@ END;
 BEGIN
   DBMS_CLOUD.CREATE_EXTERNAL_TABLE (
     table_name       => 'YELLOW_TRIPDATA_ICEBERG_EXT',
-    credential_name  => 'AWS_ICEBERG_CRED',
+    credential_name  => 'AWS_GLUE_CRED',
     file_uri_list    => 'https://nyc-public-bucket.s3.ap-northeast-2.amazonaws.com/icebergdb-tables/yellow_tripdata_iceberg/metadata/00000-393dfa5e-431f-40a9-8241-1c869c03cbd7.metadata.json',
     format           => '{"access_protocol":{"protocol_type":"iceberg"}}'
   );
@@ -1047,39 +1081,117 @@ SELECT ai '신용카드로 결제된 건들의 평균 팁 금액을 알려줘';
 -- SELECT AI 구문 사용 예제 (더 간편함!)
 
 -- 기본 분석
-SELECT AI 신용카드로 결제된 건들의 평균 팁 금액을 알려줘;
-SELECT AI 총 택시 운행 건수는?;
-SELECT AI 평균 택시 요금과 평균 이동 거리는?;
+SELECT AI '신용카드로 결제된 건들의 평균 팁 금액을 알려줘';
+SELECT AI '총 택시 운행 건수는?';
+SELECT AI '평균 택시 요금과 평균 이동 거리는?';
 
 -- 결제 방식 분석
-SELECT AI 결제 방식별로 건수와 평균 팁을 보여줘;
-SELECT AI 신용카드와 현금 결제의 평균 팁 차이는?;
+SELECT AI '결제 방식별로 건수와 평균 팁을 보여줘';
+SELECT AI '신용카드와 현금 결제의 평균 팁 차이는?';
 
 -- 시간 분석
-SELECT AI 시간대별로 운행 건수를 보여줘;
-SELECT AI 가장 바쁜 시간대는 언제야?;
-SELECT AI 새벽 시간대(0-6시) 평균 요금은?;
+SELECT AI '시간대별로 운행 건수를 보여줘';
+SELECT AI '가장 바쁜 시간대는 언제야?';
+SELECT AI '새벽 시간대(0-6시) 평균 요금은?';
 
 -- 거리 및 요금 분석
-SELECT AI 10마일 이상 장거리 운행의 평균 요금은?;
-SELECT AI 5마일 미만 단거리 운행의 비율은?;
+SELECT AI '10마일 이상 장거리 운행의 평균 요금은?';
+SELECT AI '5마일 미만 단거리 운행의 비율은?';
 
 -- 승객 분석
-SELECT AI 승객 수에 따른 평균 요금 차이를 보여줘;
-SELECT AI 1인 승객과 여러 명 승객의 팁 비율 차이는?;
+SELECT AI '승객 수에 따른 평균 요금 차이를 보여줘';
+SELECT AI '1인 승객과 여러 명 승객의 팁 비율 차이는?';
 
 -- 위치 분석
-SELECT AI 가장 많이 이용되는 픽업 위치 상위 5곳은?;
-SELECT AI 공항 픽업 요금의 평균은?;
+SELECT AI '가장 많이 이용되는 픽업 위치 상위 5곳은?';
+SELECT AI '공항 픽업 요금의 평균은?';
 
 -- 비즈니스 인사이트
-SELECT AI 수익성이 가장 높은 시간대와 거리 조합은?;
-SELECT AI 평균 팁이 가장 높은 운행 조건은?;
+SELECT AI '수익성이 가장 높은 시간대와 거리 조합은?';
+SELECT AI '평균 팁이 가장 높은 운행 조건은?';
 
 -- 대화형 질문 (연속으로)
-SELECT AI 가장 비싼 택시 요금은?;
+SELECT AI '가장 비싼 택시 요금은?';
 -- 이어서
-SELECT AI 그 운행의 이동 거리와 소요 시간도 보여줘;
+SELECT AI '그 운행의 이동 거리와 소요 시간도 보여줘';
 -- 계속
-SELECT AI 팁은 얼마였어?;
+SELECT AI '팁은 얼마였어?';
 ```
+
+---
+
+## 부록: Python Streamlit 앱 실행 가이드
+
+본 프로젝트에 포함된 `app.py`는 Streamlit 기반의 Select AI 챗봇으로, SQL Worksheet 없이도 브라우저에서 자연어 질의를 수행할 수 있습니다.
+
+### 주요 기능
+- 다양한 AI 프로파일 선택 (MySQL, PostgreSQL, Iceberg 등)
+- Chat / Narrate / SQL Only / RunSQL 4가지 모드 지원
+- 생성된 SQL 확인 및 직접 실행
+- 테이블/컬럼 Comment 편집 (AI 정확도 향상)
+- AI Feedback 등록 (잘못된 SQL 교정)
+- 최근 실행 쿼리 이력 조회
+
+### 실행 방법
+
+#### 1. 환경 설정
+`.env.example`을 복사하여 `.env` 파일을 생성하고 값을 채웁니다:
+```bash
+cp .env.example .env
+```
+```
+WALLET_DIR=/path/to/your/wallet_folder   # Wallet 압축 해제한 폴더의 절대 경로
+DB_USER=NORTHWIND                         # DB 사용자명
+DB_PASSWORD=Welcome12345#                 # DB 비밀번호
+DB_DSN=myadb_low                          # tnsnames.ora의 서비스 별칭
+WALLET_PASSWORD=WalletPass123#            # Wallet 비밀번호
+```
+> **참고:** `DB_DSN` 값은 Wallet 폴더 안의 `tnsnames.ora` 파일을 열어 확인할 수 있습니다.
+
+#### 2. Python 패키지 설치
+```bash
+pip install streamlit python-dotenv oracledb pandas
+```
+
+#### 3. 앱 실행
+```bash
+streamlit run app.py
+```
+> 브라우저가 자동으로 열리며, 사이드바에서 AI Profile을 선택한 후 채팅창에 질문을 입력하면 됩니다.
+
+---
+
+## 부록: 트러블슈팅
+
+### 1. Database Link 연결 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `ORA-28500: connection from ORACLE to a non-Oracle system returned this message` | 외부 DB 네트워크 접근 불가 | AWS 보안 그룹에서 ADB의 NAT Gateway IP를 Inbound에 추가 |
+| `ORA-01031: insufficient privileges` | DB Link 생성 권한 없음 | ADMIN에서 `GRANT CREATE DATABASE LINK TO NORTHWIND` 실행 |
+| `PLS-00201: DBMS_CLOUD_ADMIN must be declared` | 패키지 실행 권한 없음 | ADMIN에서 `GRANT EXECUTE ON DBMS_CLOUD_ADMIN TO NORTHWIND` 실행 |
+| SSL/TLS 연결 오류 | Public endpoint에 SSL 미설정 | AWS RDS에서 SSL 활성화 확인. Public endpoint는 SSL 필수 |
+
+### 2. Select AI 쿼리 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| 잘못된 테이블/컬럼 참조 | View에 COMMENT 미작성 | View에 `COMMENT ON TABLE/COLUMN` 추가. 특히 Database Link 통해 연결된 외부 테이블은 View + COMMENT 필수 |
+| LLM이 Database Link 구문 직접 생성 시도 | AI 프로파일의 `object_list`에 원본 테이블 등록 | 반드시 **View 이름**을 `object_list`에 등록. `@DB_LINK` 직접 참조 대신 View 사용 |
+| 연합 쿼리에서 조인 실패 | 테이블 간 관계 정보 부족 | COMMENT에 Foreign Key 관계를 명시 (예: "Foreign key to the customers table") |
+
+### 3. Iceberg 관련 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `ORA-29913: error in executing ODCIEXTTABFETCH` | External Table 메타데이터 접근 실패 | `GRANT READ, WRITE ON DIRECTORY DATA_PUMP_DIR TO NORTHWIND` (ADMIN에서 실행) |
+| Credential name 오류 | External Table과 Credential 이름 불일치 | `CREATE_EXTERNAL_TABLE`의 `credential_name`이 실제 생성한 Credential과 일치하는지 확인 |
+| 파티션 테이블 쿼리 실패 | 파티션된 Iceberg 테이블 미지원 | 비파티션 테이블만 지원. 파티션이 필요하면 데이터를 비파티션으로 재구성 |
+
+### 4. Python Streamlit 앱 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| DB 연결 실패 | `.env` 설정 오류 | `WALLET_DIR` 절대 경로, `DB_DSN` 값 확인 |
+| AI Profile 목록이 비어있음 | 프로파일 미생성 | 3장 핸즈온에서 프로파일을 먼저 생성 |
+| Database Link View 조회 시 오류 | 외부 DB 서버 중단 | AWS RDS 인스턴스 상태 확인. 테스트 후 중지했을 수 있음 |

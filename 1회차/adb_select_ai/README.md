@@ -1,9 +1,58 @@
 ## Oracle Autonomous AI Database: Select AI 교육 과정
 
-#### 문서 개요:
+#### 문서 개요
 - 본 교육 자료는 Oracle Autonomous AI Database(ADB)의 Select AI 기능을 활용하여, 데이터베이스와 자연어로 상호작용하는 방법을 포괄적으로 다룹니다.
 - 기본적인 Text-to-SQL 기능부터 Conversation(대화형 컨텍스트), Synthetic Data(가상 데이터 생성), Summarization(요약), Translation(번역) 등 Select AI의 다양한 고급 기능을 Northwind 데이터셋과 Python SDK를 활용해 실습합니다.
 - 또한, 최신 MCP (Model Context Protocol) 기술을 적용하여 Cursor나 VS Code 같은 IDE에서 Select AI를 직접 호출하는 AI 에이전트 서버를 구축하는 방법까지 포함합니다.
+
+#### 대상 독자
+- SQL 기본 문법을 알고 있는 개발자 또는 데이터 분석가
+- Oracle Cloud Infrastructure(OCI)를 처음 접하는 사용자도 따라할 수 있도록 단계별로 안내합니다
+- Python 경험이 없어도 3부부터의 코드를 복사-붙여넣기로 실행할 수 있습니다
+
+#### 실습 흐름 요약
+```
+[1부] 개념 이해 → [2부] DB 환경 구성 & SQL 실습 → [3부] Python SDK 실습 → [4부] MCP 서버 구축
+```
+각 부는 독립적으로 진행할 수 있지만, 2부에서 생성한 DB 스키마와 AI 프로파일이 3부·4부의 전제 조건입니다.
+
+#### 프로젝트 파일 구조
+```
+adb_select_ai/
+├── README.md              # 본 교육 문서 (현재 파일)
+├── .env.example           # 환경 변수 템플릿 (복사하여 .env 생성)
+├── .env                   # 실제 환경 변수 (git에 포함되지 않음)
+├── .gitignore             # git 제외 파일 목록
+├── db_conn.py             # DB 연결 테스트 스크립트
+├── test_connection.py     # Select AI 프로파일 연결 및 기본 질의 테스트
+├── chat.py                # 대화형 컨텍스트(Conversation) 실습
+├── synthetic_data.py      # 가상 데이터 생성 실습
+├── summarize.py           # 요약 및 번역 실습
+├── app.py                 # Streamlit 기반 AI 챗봇 GUI
+└── mcp_server.py          # MCP 서버 (IDE 연동용)
+```
+
+#### 목차
+- [1부] Oracle Autonomous AI Database: Select AI & RAG 기술 소개
+  - 1. Select AI란 무엇인가?
+  - 2. Structured RAG (정형 데이터 검색 증강 생성)
+  - 3. Select AI의 주요 고급 기능
+- [2부] 핸즈온 실습 환경 구성 및 SQL/PLSQL 활용
+  - 1. 사전 준비 사항
+  - 2. 스키마 생성 및 데이터 로드 (Northwind)
+  - 3. 인증 설정 및 메타데이터 보강
+  - 4. 자연어 질의 테스트
+  - 5. 고급 기능 실습 (Synthetic Data, Feedback)
+- [3부] Python 개발 및 Select AI 고급 기능 실습
+  - 1. Python 개발 환경 설정
+  - 2. Select AI 프로파일 로드 및 테스트
+  - 3. 고급 기능 실습 (Conversations, Synthetic Data, Summarize)
+  - 4. [Bonus] Streamlit AI Chatbot GUI
+- [4부] MCP 서버 구축 및 IDE 연동 가이드
+  - 1~3. 프로젝트 초기화 및 MCP 서버 구현
+  - 4~5. 환경 변수 및 IDE 연동 설정
+  - 6. MCP 통신 방식 및 사용 예시
+- [부록] 트러블슈팅
 
 ### [1부] Oracle Autonomous AI Database: Select AI & RAG 기술 소개
 
@@ -116,27 +165,27 @@ LLM은 계산에 약하고 사실이 아닌 정보를 지어내는 환각(Halluc
 
 ###### 2.1 사용자 생성 및 권한 부여
 Northwind 데이터를 저장할 별도의 사용자를 생성합니다.
-```
+```sql
 -- 사용자 생성
 CREATE USER NORTHWIND IDENTIFIED BY "Welcome12345#";
 ```
-```
+```sql
 -- 기본 권한 부여
 GRANT CREATE SESSION TO NORTHWIND;
 GRANT CONNECT, RESOURCE, DWROLE TO NORTHWIND;
 GRANT UNLIMITED TABLESPACE TO NORTHWIND;
 ```
-```
+```sql
 -- Select AI 및 클라우드 기능 사용 권한 부여
 GRANT EXECUTE ON DBMS_CLOUD TO NORTHWIND;
 GRANT EXECUTE ON DBMS_CLOUD_AI TO NORTHWIND;
 ```
-```
+```sql
 -- sql id 검색을 위한 권한 부여
 GRANT READ ON SYS.V_$MAPPED_SQL TO NORTHWIND;
 GRANT READ ON SYS.V_$SESSION TO NORTHWIND;
 ```
-```
+```sql
 -- Enabling User Access to Database Actions” 절차, SQL worksheet 접속을 위해 필요
 BEGIN
   ords_admin.enable_schema(
@@ -149,7 +198,7 @@ BEGIN
   COMMIT;
 END;
 ```
-```
+```sql
 -- 외부 네트워크(AI API) 접속 권한 (API Key 방식 사용 시 필수), * 대신 domain 주소 지정 가능(openai 등 을 위한 설정)
 BEGIN
   DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
@@ -165,7 +214,7 @@ END;
 ###### 2.2 테이블 생성 및 데이터 로드 (SQL 변환 완료)
 주의: 반드시 ADMIN에서 로그아웃하고, 방금 생성한 NORTHWIND 사용자로 로그인하여 실행하세요. (비밀번호: Welcome12345#)
 
-```
+```sql
 -- 1. Categories 테이블 생성
 CREATE TABLE CATEGORIES (
     CATEGORY_ID NUMBER PRIMARY KEY,
@@ -181,7 +230,7 @@ COMMENT ON COLUMN CATEGORIES.CATEGORY_NAME IS 'Name of the category (e.g., Bever
 COMMENT ON COLUMN CATEGORIES.DESCRIPTION IS 'Optional description of the category.';
 
 ```
-```
+```sql
 -- 2. Customers 테이블 생성
 CREATE TABLE CUSTOMERS (
     CUSTOMER_ID VARCHAR2(5) PRIMARY KEY,
@@ -213,7 +262,7 @@ COMMENT ON COLUMN CUSTOMERS.PHONE IS 'Customer phone number.';
 COMMENT ON COLUMN CUSTOMERS.FAX IS 'Customer fax number.';
 
 ```
-```
+```sql
 -- 3. Products 테이블 생성
 CREATE TABLE PRODUCTS (
     PRODUCT_ID NUMBER PRIMARY KEY,
@@ -244,7 +293,7 @@ COMMENT ON COLUMN PRODUCTS.REORDER_LEVEL IS 'Minimum stock level before reorder 
 COMMENT ON COLUMN PRODUCTS.DISCONTINUED IS 'Whether the product is discontinued (0 = no, 1 = yes).';
 
 ```
-```
+```sql
 -- 4. Orders 테이블 생성
 CREATE TABLE ORDERS (
     ORDER_ID NUMBER PRIMARY KEY,
@@ -283,7 +332,7 @@ COMMENT ON COLUMN ORDERS.SHIP_POSTAL_CODE IS 'Shipping ZIP/postal code.';
 COMMENT ON COLUMN ORDERS.SHIP_COUNTRY IS 'Shipping country.';
 
 ```
-```
+```sql
 -- 5. Order Details 테이블 생성
 CREATE TABLE ORDER_DETAILS (
     ORDER_ID NUMBER,
@@ -306,7 +355,7 @@ COMMENT ON COLUMN ORDER_DETAILS.QUANTITY IS 'Quantity of the product ordered.';
 COMMENT ON COLUMN ORDER_DETAILS.DISCOUNT IS 'Discount applied (0 to 1).';
 
 ```
-```
+```sql
 -- 6. 데이터 입력 (샘플 데이터)
 -- Categories (전체 8개 카테고리)
 INSERT INTO CATEGORIES VALUES (1, 'Beverages', 'Soft drinks, coffees, teas, beers, and ales');
@@ -400,7 +449,7 @@ API Key 관리 없이 IAM 권한으로 인증하는 가장 안전한 방식입�
 - DBMS_CLOUD.CREATE_CREDENTIAL로 생성하지 않음
 - OCI 리소스(ADB) 내부에서만 작동
 - Dynamic Group과 Policy가 올바르게 설정되어 있어야 함
-```
+```sql
 BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'GENAI_RP_CRED',
@@ -463,13 +512,13 @@ END;
 LLM이 테이블과 컬럼의 의미를 더 정확하게 파악할 수 있도록 JSON 형태의 Annotation을 포함한 코멘트를 추가합니다.
 
 - 테이블 레벨: 데이터의 성격 정의
-```
+```sql
 COMMENT ON TABLE PRODUCTS IS '{"comment": "판매 상품 마스터 정보", "annotation": {"description": "회사가 취급하는 모든 상품의 가격, 재고, 공급업체 정보를 포함함"}}';
 COMMENT ON TABLE ORDERS IS '{"comment": "고객 주문 헤더", "annotation": {"description": "고객이 생성한 주문의 기본 정보. 배송지 및 주문 날짜 포함"}}';
 ```
 
 - 컬럼 레벨: 비즈니스 로직 및 제약사항 가이드
-```
+```sql
 COMMENT ON COLUMN PRODUCTS.UNITS_IN_STOCK IS '{"comment": "재고 수량", "annotation": {"meaning": "현재 창고에 물리적으로 존재하는 수량"}}';
 COMMENT ON COLUMN PRODUCTS.UNITS_ON_ORDER IS '{"comment": "입고 예정 수량", "annotation": {"meaning": "공급업체에 발주하여 도착 예정인 수량"}}';
 COMMENT ON COLUMN PRODUCTS.UNIT_PRICE IS '{"comment": "단가", "annotation": {"currency": "USD", "description": "할인이 적용되지 않은 개별 상품의 기본 판매 가격"}}';
@@ -478,6 +527,8 @@ COMMENT ON COLUMN PRODUCTS.UNIT_PRICE IS '{"comment": "단가", "annotation": {"
 ###### 3.3 AI 프로파일 생성
 
 주의: 생성 시 object_list에 필요한 테이블을 지정하고, comments 속성을 true로 설정하면 위에서 작성한 annotation 주석이 LLM에 전달됩니다.
+
+> **Tip:** 3.2에서 JSON Annotation을 추가했다면 아래 프로파일의 `"comments"` 값을 반드시 `true`로 설정하세요. `false`로 두면 Annotation이 LLM에 전달되지 않아 효과가 없습니다.
 
 **프로파일 삭제 (선택사항)**
 ```sql
@@ -499,7 +550,7 @@ BEGIN
             "provider": "oci",
             "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
             "credential_name": "OCI$RESOURCE_PRINCIPAL",
-            "comments": false,
+            "comments": true,
             "object_list": [
                 {"owner": "NORTHWIND", "name": "CATEGORIES"},
                 {"owner": "NORTHWIND", "name": "PRODUCTS"},
@@ -524,7 +575,7 @@ BEGIN
             "provider": "oci",
             "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
             "credential_name": "OCI_KEY_CRED",
-            "comments": false,
+            "comments": true,
             "object_list": [
                 {"owner": "NORTHWIND", "name": "CATEGORIES"},
                 {"owner": "NORTHWIND", "name": "PRODUCTS"},
@@ -578,22 +629,22 @@ provider            oci
 
 ##### 4. 자연어 질의 테스트 (SQL Worksheet)
 
-```
+```sql
 -- 1. 프로파일 활성화
-EXEC DBMS_CLOUD_AI.SET_PROFILE('northwind_ai');
+EXEC DBMS_CLOUD_AI.SET_PROFILE('NORTHWIND_AI');
 ```
 
-```
+```sql
 -- 2. 단순 조회
 SELECT AI 'What is the product with the most stock?';
 ```
 
-```
+```sql
 -- 3. 집계 및 분석
 SELECT AI 'What is the total sales amount for the "Beverages" category?';
 ```
 
-```
+```sql
 -- 4. 쿼리 검증 (생성된 SQL 확인)
 SELECT AI showsql 'What is the total sales amount for the "Beverages" category?';
 ```
@@ -606,7 +657,7 @@ Python SDK 없이도 SQL(PL/SQL)만으로 Select AI의 고급 기능들을 사�
 
 - 시나리오: PRODUCTS 테이블에 가상 물품 1개를 추가합니다.
 
-```
+```sql
 BEGIN
   DBMS_CLOUD_AI.GENERATE_SYNTHETIC_DATA(
     profile_name => 'NORTHWIND_AI',
@@ -617,7 +668,7 @@ BEGIN
   );
 END;
 ```
-```
+```sql
 -- 생성된 데이터 확인
 SELECT * FROM products;
 ```
@@ -628,13 +679,13 @@ SELECT * FROM products;
 - 시나리오: 사용자가 "재고가 가장 많은 제품 이름 1개"를 물어봤을 때, 복잡한 SQL 코드를 작성했다고 가정합니다. 
 
   1. 부정확한 질문 실행 및 SQL ID 확인
-```
+```sql
 -- 질문 실행 (showsql로 쿼리 확인)
 EXEC DBMS_CLOUD_AI.SET_PROFILE('NORTHWIND_AI');
 SELECT AI showsql "What is the product with the most stock?"
 ```
-```
-SELECT 
+```sql
+SELECT
     p."PRODUCT_ID" AS "PRODUCT_ID"
     , p."PRODUCT_NAME" AS "PRODUCT_NAME"
     , p."UNITS_IN_STOCK" AS "UNITS_IN_STOCK" 
@@ -643,7 +694,7 @@ ORDER BY p."UNITS_IN_STOCK" DESC FETCH FIRST 1 ROW ONLY
 ```
 2. 피드백 등록 (PL/SQL) DBMS_CLOUD_AI.FEEDBACK을 사용하여 올바른 계산식을 알려줍니다.
 - v$mapped_sql ( AI 전용 테이블 뷰)에서 가장 최근에 번역된 5개 SQL_id 를 조회합니다.
-```
+```sql
 -- 실행한 sql_id 검색
 SELECT sql_id, sql_text, translation_timestamp
 FROM v$mapped_sql
@@ -652,7 +703,7 @@ ORDER BY translation_timestamp DESC
 FETCH FIRST 5 ROWS ONLY;
 ```
 참고: 피드백이 등록되면 Select AI는 다음 번 유사한 질문이 들어올 때 이 피드백을 참고하여 SQL을 생성합니다.
-```
+```sql
 BEGIN
   DBMS_CLOUD_AI.FEEDBACK(
     profile_name     => 'NORTHWIND_AI',
@@ -673,10 +724,10 @@ Select AI는 성능 향상을 위해 쿼리 결과를 캐싱합니다. 피드백
 EXEC DBMS_CLOUD_AI.SET_PROFILE('NORTHWIND_AI');
 SELECT AI showsql "What is the product with the most stock?" --202512022028;
 ```
-```
-SELECT p."PRODUCT_NAME" AS "Product Name" 
-FROM "NORTHWIND"."PRODUCTS" p 
-ORDER BY p."UNITS_IN_STOCK" DESC 
+```sql
+SELECT p."PRODUCT_NAME" AS "Product Name"
+FROM "NORTHWIND"."PRODUCTS" p
+ORDER BY p."UNITS_IN_STOCK" DESC
 FETCH FIRST 1 ROW ONLY
 ```
 
@@ -696,12 +747,12 @@ Python SDK(select_ai)를 활용하여 애플리케이션 레벨에서 Select AI�
   - MacOS / Linux:
 `curl -LsSf https://astral.sh/uv/install.sh | sh`
   - Windows:
-`powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex`
-https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/ 설치 "Desktop development with with C++" workload 설치 필요
+`powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+  - Windows 사용자: [Visual C++ Build Tools](https://visualstudio.microsoft.com/ko/visual-cpp-build-tools/) 설치 후 "Desktop development with C++" workload 선택이 필요합니다.
 
-- 사용 할 라이브러리 설치
-```
-uv init
+- 사용할 라이브러리 설치 (프로젝트 디렉토리에서 최초 1회만 실행):
+```bash
+uv init          # 프로젝트 초기화 (이미 했다면 생략)
 uv add dotenv select_ai oracledb streamlit
 ```
 - Wallet을 이용한 연결
@@ -711,14 +762,18 @@ uv add dotenv select_ai oracledb streamlit
     3. 다운로드한 파일의 압축을 풀고 경로를 기억해둡니다. (예: /Users/me/wallet_adb)
     4. select_ai.connect 함수에 wallet_location 파라미터를 추가하여 연결합니다.
 
-- .env 에서 아래 항목에 해당하는 정보를 저장하여 이 정보를 아래 python code에서 활용하도록 합니다.
+- `.env` 파일 생성: `.env.example` 파일을 복사하여 `.env` 파일을 만들고, 각 항목을 실제 값으로 채웁니다.
+```bash
+cp .env.example .env
 ```
-WALLET_DIR=
-DB_USER=
-DB_PASSWORD=
-DB_DSN=
-WALLET_PASSWORD=
 ```
+WALLET_DIR=/path/to/your/wallet_folder   # Wallet 압축 해제한 폴더의 절대 경로
+DB_USER=NORTHWIND                         # 2부에서 생성한 DB 사용자명
+DB_PASSWORD=Welcome12345#                 # DB 사용자 비밀번호
+DB_DSN=myadb_low                          # tnsnames.ora에 정의된 서비스 별칭 (Wallet 폴더 내 확인)
+WALLET_PASSWORD=WalletPass123#            # Wallet 다운로드 시 설정한 비밀번호
+```
+> **참고:** `DB_DSN` 값은 Wallet 폴더 안의 `tnsnames.ora` 파일을 열어 확인할 수 있습니다. 일반적으로 `{DB이름}_low`, `{DB이름}_medium`, `{DB이름}_high` 형태입니다. 실습에서는 `_low` 사용을 권장합니다.
 
 ```python
 import os
@@ -767,10 +822,9 @@ print("✓ Connected securely using Wallet")
 위 코드를 `db_conn.py` 파일로 저장한 후 실행:
 
 ```bash
-uv init
-uv add dotenv select_ai
 uv run db_conn.py
 ```
+> **참고:** `uv init`과 `uv add`는 프로젝트 디렉토리에서 최초 1회만 실행하면 됩니다. 이미 실행했다면 `uv run`만 사용합니다.
 
 ##### 2. Select AI 프로파일 로드 및 테스트
 PL/SQL에서 생성한 프로파일을 Python 객체로 불러와 기본 동작을 확인합니다.
@@ -845,8 +899,6 @@ print(f"\nDatabase Info: {info}")
 위 코드를 `test_connection.py` 파일로 저장하고 실행:
 
 ```bash
-uv init
-uv add dotenv select_ai
 uv run test_connection.py
 ```
 
@@ -972,8 +1024,6 @@ print("\n✨ narrate()는 팩트(데이터), chat()은 인사이트(분석)를 �
 위 코드를 `chat.py` 파일로 저장하고 실행:
 
 ```bash
-uv init
-uv add dotenv select_ai
 uv run chat.py
 ```
 
@@ -1070,8 +1120,6 @@ except Exception as e:
 ```
 
 ```bash
-uv init
-uv add dotenv select_ai
 uv run synthetic_data.py
 ```
 
@@ -1165,8 +1213,6 @@ except Exception as e:
 ```
 
 ```bash
-uv init
-uv add dotenv select_ai
 uv run summarize.py
 ```
 
@@ -1605,10 +1651,12 @@ if __name__ == "__main__":
 
 - 애플리케이션 실행
 터미널에서 다음 명령어를 실행합니다.
-```
-streamlit run app.py
-or
+```bash
+# 방법 1: uv 환경에서 실행 (권장)
 uv run streamlit run app.py
+
+# 방법 2: 직접 실행 (streamlit이 PATH에 있는 경우)
+streamlit run app.py
 ```
 
 - 결과 확인
@@ -1632,12 +1680,12 @@ Python 패키지 매니저인 uv와 MCP 서버 구축 프레임워크인 fastmcp
 
 ##### 2.1 프로젝트 초기화
 
-```
+```bash
 # 프로젝트 디렉토리 생성
 mkdir oracle-select-ai-mcp
 cd oracle-select-ai-mcp
 ```
-```
+```bash
 # uv 프로젝트 초기화 (가상환경 자동 생성)
 uv init
 ```
@@ -1646,13 +1694,13 @@ uv init
 ##### 2.2 의존성 라이브러리 추가
 MCP 서버 구축과 Oracle DB 연결에 필요한 패키지를 추가합니다.
 
-```
+```bash
 # fastmcp: MCP 서버를 쉽게 만드는 프레임워크
 # select_ai: Oracle Select AI Python SDK
 # oracledb: Oracle DB 드라이버
 uv add fastmcp select_ai oracledb
-uv add 명령은 패키지를 설치하고 pyproject.toml에 의존성을 자동으로 기록합니다.
 ```
+> `uv add` 명령은 패키지를 설치하고 `pyproject.toml`에 의존성을 자동으로 기록합니다.
 
 ##### 3. MCP 서버 구현 (mcp_server.py)
 fastmcp를 사용하여 Select AI의 핵심 기능(자연어 질의, 피드백)을 도구(Tool)로 노출하는 서버 코드를 작성합니다.
@@ -1750,7 +1798,7 @@ def ask_database(
     
     Args:
         question: Natural language question about the data
-        profile_name: AI profile to use (default: NORTHWIND_AI3)
+        profile_name: AI profile to use (default: NORTHWIND_AI)
     
     Returns:
         Natural language explanation of the query results
@@ -1788,7 +1836,7 @@ def generate_sql(
     
     Args:
         question: Natural language description of what you want to query
-        profile_name: AI profile to use (default: NORTHWIND_AI3)
+        profile_name: AI profile to use (default: NORTHWIND_AI)
     
     Returns:
         SQL query as a string
@@ -1827,7 +1875,7 @@ def chat_with_ai(
     
     Args:
         message: Your question or message
-        profile_name: AI profile to use (default: NORTHWIND_AI3)
+        profile_name: AI profile to use (default: NORTHWIND_AI)
     
     Returns:
         AI's response
@@ -1897,7 +1945,7 @@ Windows: Ctrl + ,
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/joungminko/devkit/fy26_ai_internal_training/1회차/adb_select_ai",
+        "/your/absolute/path/to/adb_select_ai",  -- 본인의 프로젝트 절대 경로로 교체
         "run",
         "mcp_server.py"
       ]
@@ -2090,3 +2138,49 @@ AI 응답:
 주문은 ORDERS와 ORDER_DETAILS로 분리되어 있으며,
 외래키로 연결되어 정규화된 구조를 갖추고 있습니다."
 ```
+
+---
+
+### [부록] 트러블슈팅
+
+실습 중 자주 발생하는 오류와 해결 방법을 정리합니다.
+
+##### 1. DB 연결 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `DPI-1047: Cannot locate a 64-bit Oracle Client library` | Oracle Instant Client 미설치 | `oracledb`는 Thin 모드를 지원하므로 별도 설치 불필요. `oracledb` 버전이 1.0 이상인지 확인 |
+| `ORA-12154: TNS:could not resolve the connect identifier` | `DB_DSN` 값이 잘못됨 | Wallet 폴더의 `tnsnames.ora` 파일을 열어 서비스 별칭 확인 |
+| `ORA-28759: failure to open file` | Wallet 경로 또는 비밀번호 오류 | `.env`의 `WALLET_DIR`이 절대 경로인지, `WALLET_PASSWORD`가 맞는지 확인 |
+| `TNS_ADMIN 관련 에러` | 환경 변수 미설정 | `import select_ai` 전에 반드시 `os.environ['TNS_ADMIN'] = WALLET_DIR` 설정 |
+
+##### 2. Select AI 프로파일 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `ORA-20000: Profile not found` | 프로파일이 생성되지 않음 | `SELECT profile_name FROM user_cloud_ai_profiles;`로 확인 |
+| `ORA-20401: Authorization failed` | GenAI 서비스 권한 없음 | Dynamic Group, Policy 설정 확인 (Resource Principal) 또는 API Key Credential 확인 |
+| 자연어 질의가 이상한 SQL을 생성 | Annotation/Comment 미적용 | 프로파일의 `comments` 속성이 `true`인지 확인 |
+
+##### 3. Python 환경 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `ModuleNotFoundError: No module named 'select_ai'` | 패키지 미설치 | `uv add select_ai` 실행 |
+| `uv: command not found` | uv 미설치 또는 PATH 미등록 | uv 설치 후 터미널 재시작. `which uv`로 경로 확인 |
+| `.env` 값이 로드되지 않음 | `.env` 파일 위치 오류 | `.env` 파일이 스크립트와 같은 디렉토리에 있는지 확인 |
+
+##### 4. MCP 서버 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| Cursor에서 MCP 도구가 보이지 않음 | 설정 파일 오류 또는 서버 미등록 | `mcp.json`의 `--directory` 경로가 절대 경로인지 확인. Cursor 재시작 |
+| MCP 서버 실행 시 즉시 종료 | `.env` 필수 변수 누락 | 터미널에서 `uv run mcp_server.py` 직접 실행하여 에러 메시지 확인 |
+| JSON 파싱 오류 | stdout에 일반 텍스트 출력 | `print()` 대신 `print(..., file=sys.stderr)` 사용. stdout은 JSON-RPC 전용 |
+
+##### 5. Streamlit 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| 브라우저가 열리지 않음 | 포트 충돌 | `uv run streamlit run app.py --server.port 8502` 로 포트 변경 |
+| DB 연결이 반복적으로 끊김 | 세션 타임아웃 | Streamlit의 `@st.cache_resource`로 연결 객체 캐싱 (app.py에 이미 적용됨) |

@@ -4,6 +4,30 @@
 
 본 교육 과정은 Oracle Autonomous Database의 **Select AI Agent** 기능을 활용하여 지능형 자율 에이전트를 구축하는 방법을 단계별로 학습합니다.
 
+#### 대상 독자
+- 1회차 Select AI 교육을 완료한 수강생 (NORTHWIND 스키마 및 AI 프로파일 생성 완료)
+- SQL/PL/SQL 기본 문법을 알고 있는 개발자 또는 데이터 분석가
+- AI Agent, ReAct 패턴 등의 개념이 처음인 분도 따라할 수 있도록 단계별로 안내합니다
+
+#### 실습 흐름 요약
+```
+[1부] 개념 이해 → [2부] Step 1~6: 기본 에이전트 구축 → [3부] Step 7~8: 고급 Tool 활용
+                        ↓
+                  [부록] Python Streamlit 앱으로 GUI 환경 체험
+```
+> **전제 조건**: 1회차에서 생성한 NORTHWIND 사용자, 테이블, AI 프로파일(`NORTHWIND_AI`)이 필요합니다.
+
+#### 프로젝트 파일 구조
+```
+adb_select_ai_agent/
+├── README.md              # 본 교육 문서 (현재 파일)
+├── .env.example           # 환경 변수 템플릿 (복사하여 .env 생성)
+├── .env                   # 실제 환경 변수 (git에 포함되지 않음)
+├── .gitignore             # git 제외 파일 목록
+├── requirements.txt       # Python 패키지 의존성
+└── app.py                 # Streamlit 기반 AI Agent 대시보드 (Python)
+```
+
 ---
 
 ### 목차
@@ -24,6 +48,10 @@
 #### [3부] 고급 Tool 활용
 - **Step 7**: 고급 Tool (RAG, WebSearch, Notification)
 - **Step 8**: 실전 응용 예제
+
+#### [부록]
+- Python Streamlit 앱 실행 가이드
+- 트러블슈팅
 
 **지원 Tool 유형**: SQL, PL/SQL, RAG, WebSearch, Notification
 
@@ -308,9 +336,10 @@ GRANT SELECT ON DBA_AI_AGENT_TOOLS TO NORTHWIND;
 GRANT SELECT ON DBA_AI_AGENT_TOOL_ATTRIBUTES TO NORTHWIND;
 ```
 
-##### 1.3 네트워크 ACL 설정 (선택사항)
+##### 1.3 네트워크 ACL 설정 (선택사항 — Step 7.3 Notification 사용 시 필수)
 
 외부 API(WebSearch, 이메일 등)를 사용할 경우 네트워크 접근 권한이 필요합니다.
+> ⚠️ **참고**: Step 7.3 Notification Tool을 실습하려면 이 단계를 반드시 먼저 실행해야 합니다.
 
 ```sql
 -- ===============================================
@@ -320,7 +349,8 @@ GRANT SELECT ON DBA_AI_AGENT_TOOL_ATTRIBUTES TO NORTHWIND;
 -- ===============================================
   
   -- SMTP 서버 접근 권한 (Email Notification 사용 시)
-  -- 상세 설정은 Step 11.3 Notification Tool 섹션 참조
+  -- 상세 설정은 Step 7.3 Notification Tool 섹션 참조
+BEGIN
   DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
     host       => 'smtp.email.us-chicago-1.oci.oraclecloud.com',
     lower_port => 587,
@@ -550,6 +580,7 @@ BEGIN
     v_result := generate_return(10248, 'defective');
     DBMS_OUTPUT.PUT_LINE('Generated RMA: ' || v_result);
 END;
+/
 
 select * from returns;
 ```
@@ -565,7 +596,8 @@ select * from returns;
 
 BEGIN
     DBMS_CLOUD_AI_AGENT.DROP_TOOL('Return_Auth_Generator');
-    EXCEPTION WHEN OTHERS THEN NULL;
+EXCEPTION
+    WHEN OTHERS THEN NULL;
 END;
 
 BEGIN
@@ -573,7 +605,7 @@ BEGIN
     tool_name   => 'Return_Auth_Generator',
     attributes  => '{
                       "instruction": "Use this tool to generate a Return Merchandise Authorization (RMA) number when a customer wants to return a product. This tool requires two parameters: order_id (number) and reason (string describing why they want to return).",
-                      "function": "generate_return_auth"
+                      "function": "generate_return"
                     }',
     description => 'Generates RMA numbers for product returns. Call this when customer requests a return or refund.'
   );
@@ -738,9 +770,11 @@ GROUP BY TOOL_NAME;
 -- 설명: 고객 지원 업무를 정의하는 Task
 -- 실행 계정: NORTHWIND
 -- 전제조건: SQL_Analysis_Tool, Return_Auth_Generator, EMAIL_NOTIFY tool가 생성되어 있어야 함
---          (EMAIL_NOTIFY 생성 방법은 Step 11.3 참조)
+--          (EMAIL_NOTIFY 생성 방법은 Step 7.3 참조)
 -- ===============================================
--- task의 instruction에 {query}가 들어가 있지 않으면 오동작함, 패치 예정이라고 함
+-- ⚠️ 중요: instruction 텍스트에 반드시 {query} 플레이스홀더를 포함해야 합니다!
+-- {query}가 없으면 사용자 입력이 LLM에 전달되지 않아 오동작합니다.
+-- (향후 패치 예정이나, 현재 버전에서는 필수)
 
 BEGIN
   DBMS_CLOUD_AI_AGENT.DROP_TASK('Customer_Service_Task');
@@ -772,6 +806,8 @@ END;
 **Task Instruction 속성:**
 - 작업이 무엇을 수행해야 하는지 설명하는 명확하고 간결한 설명문
 - **LLM에 전송되는 프롬프트에 포함됨**
+
+> **⚠️ 필수**: instruction 텍스트에 **`{query}`** 플레이스홀더를 반드시 포함해야 합니다. 이 자리에 사용자의 실제 질문이 치환되어 LLM에 전달됩니다. `{query}`가 없으면 사용자 입력이 무시되어 에이전트가 오동작합니다.
 
 **Instruction 작성 팁:**
 - **구체적으로**: 명확하게 작성 필요
@@ -1040,39 +1076,45 @@ ORDER BY T.AGENT_TEAM_NAME;
 -- 실행 계정: NORTHWIND
 -- ===============================================
 
--- conversation ID 생성, 예: 45947AFB-7E7F-740E-E063-551A000A7755
+-- 1단계: conversation ID 생성
+-- 실행 후 출력되는 ID를 메모해두세요. 이후 같은 대화 세션에서 반복 사용합니다.
 DECLARE
-    l_team_cov_id varchar2(4000);
+    l_team_cov_id VARCHAR2(4000);
 BEGIN
-    l_team_cov_id := DBMS_CLOUD_AI.create_conversation();
-   DBMS_OUTPUT.PUT_LINE('Created conversation with ID: ' || l_team_cov_id);
+    l_team_cov_id := DBMS_CLOUD_AI.CREATE_CONVERSATION();
+    DBMS_OUTPUT.PUT_LINE('Created conversation with ID: ' || l_team_cov_id);
 END;
 /
 
+-- 2단계: 에이전트에게 질문 (위에서 생성된 conversation ID를 아래에 붙여넣기)
+-- ※ 아래 conversation_id 값을 본인이 생성한 ID로 교체하세요!
 DECLARE
   l_res     CLOB;
+  l_conv_id VARCHAR2(100) := '여기에_위에서_생성된_ID_붙여넣기';  -- 예: 45947AFB-7E7F-740E-E063-551A000A7755
 BEGIN
   l_res := run_team_clob(
              p_team_name   => 'Northwind_Support_Team',
              p_user_prompt => 'query what is most expensive product?',
-             p_params      => '{"conversation_id": "' || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}'
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
            );
 
-  DBMS_OUTPUT.PUT_LINE('conversation id: '  || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}');
+  DBMS_OUTPUT.PUT_LINE('conversation id: ' || l_conv_id);
   DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
 END;
 /
 
+-- 3단계: 같은 대화 세션에서 후속 질문 (멀티턴 대화 테스트)
 DECLARE
   l_res     CLOB;
+  l_conv_id VARCHAR2(100) := '여기에_위에서_생성된_ID_붙여넣기';  -- 위와 동일한 ID 사용
 BEGIN
   l_res := run_team_clob(
              p_team_name   => 'Northwind_Support_Team',
              p_user_prompt => 'What was last response?',
-             p_params      => '{"conversation_id": "' || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}'
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
            );
 
-  DBMS_OUTPUT.PUT_LINE('conversation id: '  || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}');
+  DBMS_OUTPUT.PUT_LINE('conversation id: ' || l_conv_id);
   DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
 END;
 /
@@ -1092,30 +1134,33 @@ END;
 -- 실행 계정: NORTHWIND
 -- ===============================================
 
+-- ※ 아래 l_conv_id 값을 테스트 6.1에서 생성한 본인의 conversation ID로 교체하세요!
 DECLARE
   l_res     CLOB;
+  l_conv_id VARCHAR2(100) := '여기에_위에서_생성된_ID_붙여넣기';  -- 예: 45947AFB-7E7F-740E-E063-551A000A7755
 BEGIN
   l_res := run_team_clob(
              p_team_name   => 'Northwind_Support_Team',
              p_user_prompt => 'I received order 10248 but it is defective. I need to return it.',
-             p_params      => '{"conversation_id": "' || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}'
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
            );
 
-  DBMS_OUTPUT.PUT_LINE('conversation id: '  || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}');
+  DBMS_OUTPUT.PUT_LINE('conversation id: ' || l_conv_id);
   DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
 END;
 /
 
 DECLARE
   l_res     CLOB;
+  l_conv_id VARCHAR2(100) := '여기에_위에서_생성된_ID_붙여넣기';  -- 위와 동일한 ID 사용
 BEGIN
   l_res := run_team_clob(
              p_team_name   => 'Northwind_Support_Team',
              p_user_prompt => 'What was last response?',
-             p_params      => '{"conversation_id": "' || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}'
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
            );
 
-  DBMS_OUTPUT.PUT_LINE('conversation id: '  || '45947AFB-7E7F-740E-E063-551A000A7755' || '"}');
+  DBMS_OUTPUT.PUT_LINE('conversation id: ' || l_conv_id);
   DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
 END;
 /
@@ -1232,7 +1277,8 @@ Select AI Agent는 SQL/PL/SQL 외에도 다양한 내장 tool를 지원합니다
 SELECT object_name, bytes 
 FROM DBMS_CLOUD.LIST_OBJECTS(
     credential_name => 'OCI_KEY_CRED',
-    location_uri    => 'https://swiftobjectstorage.us-chicago-1.oraclecloud.com/v1/apackrsct01/AIDP_OS'
+    location_uri    => 'https://swiftobjectstorage.<your-region>.oraclecloud.com/v1/<your-namespace>/<your-bucket>'
+    -- 예: 'https://swiftobjectstorage.us-chicago-1.oraclecloud.com/v1/apackrsct01/AIDP_OS'
 );
 /
 
@@ -1254,7 +1300,7 @@ BEGIN
     index_name => 'RAG_INDEX',
     attributes => '{
         "vector_db_provider": "oracle",
-        "location": "https://swiftobjectstorage.us-chicago-1.oraclecloud.com/v1/apackrsct01/AIDP_OS",
+        "location": "https://swiftobjectstorage.<your-region>.oraclecloud.com/v1/<your-namespace>/<your-bucket>",
         "object_storage_credential_name": "OCI_KEY_CRED",
         "profile_name": "EMBED_PROFILE",
         "vector_dimension": 1536,
@@ -1272,7 +1318,7 @@ DBMS_CLOUD_AI.CREATE_PROFILE(
     attributes =>'{"provider": "oci",
         "credential_name": "OCI_KEY_CRED",
         "vector_index_name": "RAG_INDEX",
-        "oci_compartment_id": "ocid1.compartment.oc1..aaaaaaaam3amapwxz6nyciqzb2v2iwg66t22g47vabo5ilnghbsskooeop3q",
+        "oci_compartment_id": "ocid1.compartment.oc1..your-compartment-ocid-here",
         "temperature": 0.2,
         "max_tokens": 3000
     }');
@@ -1302,7 +1348,7 @@ BEGIN
   DBMS_CLOUD.CREATE_CREDENTIAL(
     credential_name => 'OPENAI_CRED',
     username        => 'OPENAI',
-    password        => ''
+    password        => 'your-openai-api-key-here'  -- OpenAI API Key를 입력하세요
   );
 END;
 /
@@ -1345,12 +1391,17 @@ BEGIN
     }'
   );
 END;
+/
 
 BEGIN
   DBMS_CLOUD_AI_AGENT.CREATE_AGENT(
-    agent_name => 'A_WEB_SEARCHER',
-    profile_name => 'WEBSEARCH_PROFILE',
-    description => 'Agent that uses web search'
+    agent_name  => 'A_WEB_SEARCHER',
+    attributes  => '{
+      "provider": "openai",
+      "credential_name": "OPENAI_CRED",
+      "model": "gpt-4",
+      "description": "Agent that uses web search"
+    }'
   );
 END;
 /
@@ -1484,8 +1535,8 @@ BEGIN
         "credential_name": "OCI_SMTP_CRED",
         "smtp_host": "smtp.email.us-chicago-1.oci.oraclecloud.com",
         "smtp_port": 587,
-        "sender": "jmko79@gmail.com",
-        "recipient": "jmko79@gmail.com",
+        "sender": "your-approved-sender@example.com",
+        "recipient": "recipient@example.com",
         "encryption": "STARTTLS"
       }
     }',
@@ -1661,3 +1712,93 @@ WHERE UPPER(PROMPT) LIKE '%EMAIL%'
 ORDER BY CREATED DESC
 FETCH FIRST 10 ROWS ONLY;
 ```
+
+---
+
+### [부록] Python Streamlit 앱 실행 가이드
+
+본 프로젝트에 포함된 `app.py`는 Streamlit 기반의 웹 대시보드로, SQL Worksheet 없이도 브라우저에서 Select AI Agent와 대화할 수 있는 GUI 환경을 제공합니다.
+
+#### 주요 기능
+- 생성된 Team 목록 조회 및 선택
+- Team에 소속된 Agent, Task, Tool 계층 구조 탐색
+- 채팅 인터페이스로 Agent에 자연어 질의
+- 실행 단계(Thought → Action → Observation) 시각화
+- 대화 이력(Conversation History) 조회
+
+#### 실행 방법
+
+##### 1. 환경 설정
+`.env.example`을 복사하여 `.env` 파일을 생성하고 값을 채웁니다:
+```bash
+cp .env.example .env
+```
+```
+WALLET_DIR=/path/to/your/wallet_folder   # Wallet 압축 해제한 폴더의 절대 경로
+DB_USER=NORTHWIND                         # DB 사용자명
+DB_PASSWORD=Welcome12345#                 # DB 비밀번호
+DB_DSN=myadb_low                          # tnsnames.ora의 서비스 별칭
+WALLET_PASSWORD=WalletPass123#            # Wallet 비밀번호
+```
+> **참고:** `DB_DSN` 값은 Wallet 폴더 안의 `tnsnames.ora` 파일을 열어 확인할 수 있습니다. 일반적으로 `{DB이름}_low`, `{DB이름}_medium`, `{DB이름}_high` 형태입니다.
+
+##### 2. Python 패키지 설치
+```bash
+# 가상환경 생성 (권장)
+python -m venv venv
+source venv/bin/activate       # Mac/Linux
+# venv\Scripts\activate        # Windows
+
+# 패키지 설치
+pip install -r requirements.txt
+```
+
+##### 3. 앱 실행
+```bash
+streamlit run app.py
+```
+> 브라우저가 자동으로 열리며, 사이드바에서 Team을 선택한 후 채팅창에 질문을 입력하면 됩니다.
+
+---
+
+### [부록] 트러블슈팅
+
+##### 1. Agent 권한 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `ORA-00942: table or view does not exist` | Agent 메타데이터 조회 권한 없음 | ADMIN 계정에서 `GRANT SELECT ON DBA_AI_AGENT_*` 실행 (Step 1.2 참조) |
+| `PLS-00201: DBMS_CLOUD_AI_AGENT must be declared` | Agent 패키지 실행 권한 없음 | ADMIN에서 `GRANT EXECUTE ON C##CLOUD$SERVICE.DBMS_CLOUD_AI_AGENT` 실행 |
+| `ORA-06550: insufficient privileges` | LOB 처리 권한 없음 | ADMIN에서 `GRANT EXECUTE ON DBMS_LOB TO NORTHWIND` 실행 |
+
+##### 2. Tool 관련 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| PL/SQL Tool이 `function not found` | Tool의 `function` 속성과 실제 함수명 불일치 | `CREATE_TOOL`의 `"function"` 값이 실제 PL/SQL 함수명과 정확히 일치하는지 확인 |
+| SQL Tool이 잘못된 SQL 생성 | AI 프로파일의 메타데이터 부족 | 프로파일의 `comments` 속성을 `true`로, 테이블/컬럼 COMMENT 보강 |
+| WebSearch Tool 오류 | OpenAI Credential 미설정 | `DBMS_CLOUD.CREATE_CREDENTIAL`로 OpenAI API Key 등록 확인 |
+
+##### 3. Task/Team 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| 에이전트가 사용자 입력을 무시 | Task instruction에 `{query}` 누락 | instruction 텍스트에 반드시 `{query}` 플레이스홀더 포함 |
+| `SET_TEAM` 후에도 에이전트 미작동 | 세션이 바뀜 | `SET_TEAM`은 세션 단위. 새 세션마다 다시 실행 필요 |
+| `RUN_TEAM` 시 CLOB 오류 | AUTONOMOUS_TRANSACTION 미사용 | `run_team_clob` 래퍼 함수 사용 (Step 1.4 참조) |
+
+##### 4. Email Notification 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| `ORA-24247: network access denied` | SMTP ACL 미설정 | ADMIN에서 `DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE` 실행 (Step 7.3 참조) |
+| 이메일이 발송되지 않음 | sender 이메일이 OCI에서 승인되지 않음 | OCI Console → Email Delivery → Approved Senders에서 발신 주소 등록 |
+| SMTP 인증 실패 | Credential 정보 불일치 | OCI SMTP Credential의 username/password 재확인 |
+
+##### 5. Python Streamlit 앱 오류
+
+| 증상 | 원인 | 해결 방법 |
+|------|------|-----------|
+| DB 연결 실패 | `.env` 설정 오류 | `WALLET_DIR` 절대 경로, `DB_DSN` 값 확인. `tnsnames.ora`에서 서비스 별칭 확인 |
+| Team 목록이 비어있음 | Agent 객체 미생성 | 2부 Step 2~5를 먼저 완료하고 Team을 생성/활성화해야 함 |
+| `ModuleNotFoundError` | 패키지 미설치 | `pip install -r requirements.txt` 실행 |
