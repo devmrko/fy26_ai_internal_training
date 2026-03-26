@@ -550,7 +550,7 @@ BEGIN
         profile_name => 'NORTHWIND_AI',
         attributes   => '{
             "provider": "oci",
-            "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+            "model": "xai.grok-4-1-fast-non-reasoning",
             "credential_name": "OCI$RESOURCE_PRINCIPAL",
             "comments": true,
             "object_list": [
@@ -575,7 +575,7 @@ BEGIN
         profile_name => 'NORTHWIND_AI',
         attributes   => '{
             "provider": "oci",
-            "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+            "model": "xai.grok-4-1-fast-non-reasoning",
             "credential_name": "OCI_KEY_CRED",
             "comments": true,
             "object_list": [
@@ -594,9 +594,9 @@ END;
 **주요 파라미터:**
 - `provider`: "oci" (OCI GenAI) 또는 "openai" (OpenAI) 선택
 - `model`: 사용할 모델 지정
-  - `meta.llama-4-maverick-17b-128e-instruct-fp8`: Llama 4 모델 (권장)
-  - `cohere.command-r-plus`: Cohere Command R+ 모델
-  - `meta.llama-3.1-405b-instruct`: Llama 3.1 405B 모델
+  - `xai.grok-4-1-fast-non-reasoning`: xAI Grok 4.1 Fast 모델 (권장)
+  - `meta.llama-4-maverick-17b-128e-instruct-fp8`: Llama 4 Maverick 모델
+  - `google.gemini-2.5-flash`: Google Gemini 2.5 Flash 모델
 - `credential_name`: 인증 방식 지정
   - `OCI$RESOURCE_PRINCIPAL`: Resource Principal 사용 (프로덕션) - **$ 기호 포함 주의**
   - `OCI_KEY_CRED`: API Key 사용 (개발/테스트)
@@ -622,7 +622,7 @@ ATTRIBUTE_NAME      ATTRIBUTE_VALUE
 ------------------- --------------------------------------------------
 comments            true
 credential_name     OCI$RESOURCE_PRINCIPAL (또는 OCI_KEY_CRED)
-model               meta.llama-4-maverick-17b-128e-instruct-fp8
+model               xai.grok-4-1-fast-non-reasoning
 object_list         [{"owner":"NORTHWIND","name":"CATEGORIES"}...]
 provider            oci
 ```

@@ -415,7 +415,7 @@ BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
       profile_name => 'AWS_RDS_AI_PROFILE',
       attributes   => '{"provider": "oci", 
-                        "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+                        "model": "xai.grok-4-1-fast-non-reasoning",
                         "credential_name": "OCI_KEY_CRED",
                         "object_list": [
                             {"owner": "NORTHWIND", "name": "VIEW_RDS_CUSTOMERS"},
@@ -503,7 +503,7 @@ BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
       profile_name => 'MYSQL_OPTIMIZED_PROFILE',
       attributes   => '{"provider": "oci", 
-                        "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+                        "model": "xai.grok-4-1-fast-non-reasoning",
                         "credential_name": "OCI_KEY_CRED",
                         "object_list": [
                             {"owner": "NORTHWIND", "name": "VIEW_RDS_CUSTOMERS"},
@@ -800,7 +800,7 @@ BEGIN
   DBMS_CLOUD_AI.CREATE_PROFILE(
       profile_name => 'AWS_POSTGRES_AI_PROFILE',
       attributes   => '{"provider": "oci", 
-                        "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+                        "model": "xai.grok-4-1-fast-non-reasoning",
                         "credential_name": "OCI_KEY_CRED",
                         "object_list": [
                             {"owner": "NORTHWIND", "name": "VIEW_CUSTOMERS"},
@@ -1058,7 +1058,7 @@ BEGIN
     profile_name => 'SIDECAR_AI_PROFILE',
     attributes   => '{
       "provider": "oci",
-      "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
+      "model": "xai.grok-4-1-fast-non-reasoning",
       "credential_name": "OCI_KEY_CRED",
       "object_list": [
         {"owner": "NORTHWIND", "name": "NYC_TAXI_VIEW"}
