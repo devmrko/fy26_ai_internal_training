@@ -2038,16 +2038,112 @@ print("Debug: Connecting to database...", file=sys.stderr, flush=True)
 print("Debug: Connecting to database...")
 ```
 
+##### 6.3 HTTP/SSE 통신 방식 (원격 접속용)
+
+STDIO는 로컬 IDE에서만 사용 가능합니다. 원격 클라이언트나 웹 기반 도구에서 MCP 서버에 접속하려면 **HTTP/SSE(Server-Sent Events)** 방식을 사용합니다.
+
+**방법 1: mcp_server.py에 `--http` 옵션 추가**
+
+mcp_server.py의 서버 시작 부분이 HTTP 모드를 지원합니다:
+
+```bash
+# STDIO 모드 (기본값, IDE 연동용)
+uv run mcp_server.py
+
+# HTTP/SSE 모드 (원격 접속용, 포트 8000)
+uv run mcp_server.py --http 8000
+```
+
+**방법 2: npx supergateway로 STDIO를 HTTP로 프록시**
+
+기존 STDIO 서버를 변경 없이 HTTP로 노출할 수 있습니다:
+
+```bash
+# supergateway 설치 없이 바로 실행 (npx가 자동 설치)
+npx -y supergateway \
+  --stdio "uv --directory /your/path/to/adb_select_ai run mcp_server.py" \
+  --port 8000
+```
+
+**HTTP/SSE 모드에서 사용 가능한 엔드포인트:**
+
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `GET /sse` | SSE 스트림 연결 (클라이언트가 먼저 연결) |
+| `POST /messages` | JSON-RPC 요청 전송 |
+
+**MCP Tool 선언 (HTTP 클라이언트에서 확인 가능):**
+
+서버에 연결하면 다음 3개의 Tool이 자동으로 노출됩니다:
+
+```json
+{
+  "tools": [
+    {
+      "name": "ask_database",
+      "description": "Ask a question about the Northwind database in natural language. Returns results with explanation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {"type": "string", "description": "Natural language question about the data"},
+          "profile_name": {"type": "string", "default": "NORTHWIND_AI", "description": "AI profile to use"}
+        },
+        "required": ["question"]
+      }
+    },
+    {
+      "name": "generate_sql",
+      "description": "Generate SQL code from natural language without executing it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "question": {"type": "string", "description": "Natural language description of what you want to query"},
+          "profile_name": {"type": "string", "default": "NORTHWIND_AI", "description": "AI profile to use"}
+        },
+        "required": ["question"]
+      }
+    },
+    {
+      "name": "chat_with_ai",
+      "description": "Have a general conversation with the AI about the database schema, concepts, or general help.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {"type": "string", "description": "Your question or message"},
+          "profile_name": {"type": "string", "default": "NORTHWIND_AI", "description": "AI profile to use"}
+        },
+        "required": ["message"]
+      }
+    }
+  ]
+}
+```
+
+**IDE에서 HTTP/SSE 서버 연동 (Cursor 예시):**
+
+```json
+{
+  "mcpServers": {
+    "oracle-select-ai": {
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
+
 ##### 6.4 로컬 테스트
 
 IDE 연동 전에 로컬에서 MCP 서버를 테스트할 수 있습니다:
 
 ```bash
 # 프로젝트 디렉토리로 이동
-cd /Users/joungminko/devkit/fy26_ai_internal_training/1회차/adb_select_ai
+cd /your/path/to/adb_select_ai
 
-# MCP 서버 실행
+# STDIO 모드로 실행
 uv run mcp_server.py
+
+# 또는 HTTP 모드로 실행
+uv run mcp_server.py --http 8000
 ```
 
 **예상 출력 (STDERR):**

@@ -196,9 +196,8 @@ def chat_with_ai(
 # ============================================================================
 
 if __name__ == "__main__":
-    # Start MCP server
-    # This will be called by Cursor/Claude Desktop
     import sys
+
     print("="*80, file=sys.stderr, flush=True)
     print("Starting Oracle Select AI MCP Server...", file=sys.stderr, flush=True)
     print(f"✓ .env file loaded from: {os.getcwd()}", file=sys.stderr, flush=True)
@@ -207,6 +206,16 @@ if __name__ == "__main__":
     print(f"✓ Database user: {DB_USER}", file=sys.stderr, flush=True)
     print(f"✓ Default AI profile: {DEFAULT_PROFILE}", file=sys.stderr, flush=True)
     print(f"✓ Available tools: ask_database, generate_sql, chat_with_ai", file=sys.stderr, flush=True)
-    print("="*80, file=sys.stderr, flush=True)
-    
-    mcp.run()
+
+    # --http <port> 옵션: HTTP/SSE 모드로 실행 (원격 접속용)
+    # 옵션 없이 실행 시: STDIO 모드 (IDE 연동용)
+    if len(sys.argv) >= 3 and sys.argv[1] == "--http":
+        port = int(sys.argv[2])
+        print(f"✓ Transport: HTTP/SSE (port {port})", file=sys.stderr, flush=True)
+        print(f"✓ SSE endpoint: http://localhost:{port}/sse", file=sys.stderr, flush=True)
+        print("="*80, file=sys.stderr, flush=True)
+        mcp.run(transport="sse", host="0.0.0.0", port=port)
+    else:
+        print(f"✓ Transport: STDIO", file=sys.stderr, flush=True)
+        print("="*80, file=sys.stderr, flush=True)
+        mcp.run()
