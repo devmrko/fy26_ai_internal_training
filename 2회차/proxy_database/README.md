@@ -46,6 +46,8 @@ proxy_database/
 - OCI (Oracle Cloud Infrastructure) 계정 및 API Keys
 - 선택사항: 외부 데이터베이스 (PostgreSQL, MySQL 등) 접속 정보
 
+> **인증 방식 안내:** AI 프로파일의 credential은 Resource Principal(`OCI$RESOURCE_PRINCIPAL`)도 사용 가능하나, 본 교육에서는 **API Key 방식(`OCI_KEY_CRED`)**으로 진행합니다.
+
 ---
 
 ## 1. Select AI 아키텍처와 "Sidecar" 모델
@@ -344,25 +346,26 @@ CREATE OR REPLACE VIEW VIEW_RDS_CUSTOMERS AS SELECT * FROM "ecommerce_poc"."cust
 CREATE OR REPLACE VIEW VIEW_RDS_ORDERS AS SELECT * FROM "ecommerce_poc"."orders"@RDS_LINK;
 CREATE OR REPLACE VIEW VIEW_RDS_PRODUCTS AS SELECT * FROM "ecommerce_poc"."products"@RDS_LINK;
 
-COMMENT ON TABLE "VIEW_RDS_CUSTOMERS" IS 'Stores customer profiles and demographic information';
-COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
-COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."customer_id" IS 'Unique identifier for the customer';
-COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."full_name" IS 'The first and last name of the customer';
-COMMENT ON COLUMN "VIEW_RDS_CUSTOMERS"."email" IS 'Customer email address used for login and notifications';
+-- 테이블 COMMENT: PK/FK 및 참조 관계를 반드시 명시 (Select AI가 올바른 JOIN SQL을 생성하기 위해 필수!)
+COMMENT ON TABLE VIEW_RDS_CUSTOMERS IS 'Stores customer profiles and demographic information. Primary Key: customer_id. Referenced by VIEW_RDS_ORDERS(customer_id)';
+COMMENT ON COLUMN VIEW_RDS_CUSTOMERS."customer_id" IS 'Primary Key. Unique identifier for the customer';
+COMMENT ON COLUMN VIEW_RDS_CUSTOMERS."full_name" IS 'The first and last name of the customer';
+COMMENT ON COLUMN VIEW_RDS_CUSTOMERS."email" IS 'Customer email address used for login and notifications';
+COMMENT ON COLUMN VIEW_RDS_CUSTOMERS."region" IS 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
 
-COMMENT ON TABLE "VIEW_RDS_PRODUCTS" IS 'Catalog of available items for sale with pricing and inventory status';
-COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."product_id" IS 'Unique identifier for the product';
-COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."product_name" IS 'Commercial name of the product';
-COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."category" IS 'Product category: Electronics, Clothing, Home, or Sports';
-COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."price" IS 'Unit price of the product in USD';
-COMMENT ON COLUMN "VIEW_RDS_PRODUCTS"."stock_quantity" IS 'Current inventory level. If 0, product is out of stock';
+COMMENT ON TABLE VIEW_RDS_PRODUCTS IS 'Catalog of available items for sale with pricing and inventory status. Primary Key: product_id';
+COMMENT ON COLUMN VIEW_RDS_PRODUCTS."product_id" IS 'Primary Key. Unique identifier for the product';
+COMMENT ON COLUMN VIEW_RDS_PRODUCTS."product_name" IS 'Commercial name of the product';
+COMMENT ON COLUMN VIEW_RDS_PRODUCTS."category" IS 'Product category: Electronics, Clothing, Home, or Sports';
+COMMENT ON COLUMN VIEW_RDS_PRODUCTS."price" IS 'Unit price of the product in USD';
+COMMENT ON COLUMN VIEW_RDS_PRODUCTS."stock_quantity" IS 'Current inventory level. If 0, product is out of stock';
 
-COMMENT ON TABLE "VIEW_RDS_ORDERS" IS 'Transaction history headers. Use this to calculate revenue or sales volume';
-COMMENT ON COLUMN "VIEW_RDS_ORDERS"."order_id" IS 'Unique identifier for the order transaction';
-COMMENT ON COLUMN "VIEW_RDS_ORDERS"."customer_id" IS 'Foreign key to the customers table';
-COMMENT ON COLUMN "VIEW_RDS_ORDERS"."order_date" IS 'Timestamp when the order was placed';
-COMMENT ON COLUMN "VIEW_RDS_ORDERS"."total_amount" IS 'Total value of the order in USD including tax';
-COMMENT ON COLUMN "VIEW_RDS_ORDERS"."status" IS 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
+COMMENT ON TABLE VIEW_RDS_ORDERS IS 'Transaction history headers. Primary Key: order_id. Foreign Key: customer_id references VIEW_RDS_CUSTOMERS(customer_id). Use this to calculate revenue or sales volume';
+COMMENT ON COLUMN VIEW_RDS_ORDERS."order_id" IS 'Primary Key. Unique identifier for the order transaction';
+COMMENT ON COLUMN VIEW_RDS_ORDERS."customer_id" IS 'Foreign Key referencing VIEW_RDS_CUSTOMERS(customer_id). Identifies the customer who placed the order';
+COMMENT ON COLUMN VIEW_RDS_ORDERS."order_date" IS 'Timestamp when the order was placed';
+COMMENT ON COLUMN VIEW_RDS_ORDERS."total_amount" IS 'Total value of the order in USD including tax';
+COMMENT ON COLUMN VIEW_RDS_ORDERS."status" IS 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
 
 ```
 
@@ -729,46 +732,49 @@ SELECT * FROM "public"."orders"@RDS_POSTGRES_LINK;
 
 **Step 2: Local View에 COMMENT 추가 (Select AI에 필수!)**
 
+> **주의 (대소문자):** Oracle은 큰따옴표 없이 생성한 객체 이름을 **대문자로 저장**합니다. 위에서 `CREATE VIEW view_customers`로 생성했지만 Oracle 내부에는 `VIEW_CUSTOMERS`로 저장됩니다. 따라서 COMMENT 작성 시 테이블명에 큰따옴표를 쓰면 소문자로 찾아 `ORA-00942` 오류가 발생합니다. 아래처럼 **테이블명은 큰따옴표 없이**, 컬럼명은 PostgreSQL에서 넘어온 소문자이므로 **큰따옴표를 유지**합니다.
+
 ```sql
 -- NORTHWIND 사용자로 실행:
+-- 테이블 COMMENT: PK/FK 및 참조 관계를 반드시 명시 (Select AI가 올바른 JOIN SQL을 생성하기 위해 필수!)
 -- Customers View 주석
-COMMENT ON TABLE "view_customers" IS 
-'Stores customer profiles and demographic information';
-COMMENT ON COLUMN "view_customers"."customer_id" IS 
-'Unique identifier for the customer';
-COMMENT ON COLUMN "view_customers"."full_name" IS 
+COMMENT ON TABLE VIEW_CUSTOMERS IS
+'Stores customer profiles and demographic information. Primary Key: customer_id. Referenced by VIEW_ORDERS(customer_id)';
+COMMENT ON COLUMN VIEW_CUSTOMERS."customer_id" IS
+'Primary Key. Unique identifier for the customer';
+COMMENT ON COLUMN VIEW_CUSTOMERS."full_name" IS
 'The first and last name of the customer';
-COMMENT ON COLUMN "view_customers"."email" IS 
+COMMENT ON COLUMN VIEW_CUSTOMERS."email" IS
 'Customer email address used for login and notifications';
-COMMENT ON COLUMN "view_customers"."region" IS 
+COMMENT ON COLUMN VIEW_CUSTOMERS."region" IS
 'Geographic region of the customer (e.g., NA, EMEA, APAC)';
 
 -- Products View 주석
-COMMENT ON TABLE "view_products" IS 
-'Catalog of available items for sale with pricing and inventory status';
-COMMENT ON COLUMN "view_products"."product_id" IS 
-'Unique identifier for the product';
-COMMENT ON COLUMN "view_products"."product_name" IS 
+COMMENT ON TABLE VIEW_PRODUCTS IS
+'Catalog of available items for sale with pricing and inventory status. Primary Key: product_id';
+COMMENT ON COLUMN VIEW_PRODUCTS."product_id" IS
+'Primary Key. Unique identifier for the product';
+COMMENT ON COLUMN VIEW_PRODUCTS."product_name" IS
 'Commercial name of the product';
-COMMENT ON COLUMN "view_products"."category" IS 
+COMMENT ON COLUMN VIEW_PRODUCTS."category" IS
 'Product category: Electronics, Clothing, Home, or Sports';
-COMMENT ON COLUMN "view_products"."price" IS 
+COMMENT ON COLUMN VIEW_PRODUCTS."price" IS
 'Unit price of the product in USD';
-COMMENT ON COLUMN "view_products"."stock_quantity" IS 
+COMMENT ON COLUMN VIEW_PRODUCTS."stock_quantity" IS
 'Current inventory level. If 0, product is out of stock';
 
 -- Orders View 주석
-COMMENT ON TABLE "view_orders" IS 
-'Transaction history headers. Use this to calculate revenue or sales volume';
-COMMENT ON COLUMN "view_orders"."order_id" IS 
-'Unique identifier for the order transaction';
-COMMENT ON COLUMN "view_orders"."customer_id" IS 
-'Foreign key to the customers table';
-COMMENT ON COLUMN "view_orders"."order_date" IS 
+COMMENT ON TABLE VIEW_ORDERS IS
+'Transaction history headers. Primary Key: order_id. Foreign Key: customer_id references VIEW_CUSTOMERS(customer_id). Use this to calculate revenue or sales volume';
+COMMENT ON COLUMN VIEW_ORDERS."order_id" IS
+'Primary Key. Unique identifier for the order transaction';
+COMMENT ON COLUMN VIEW_ORDERS."customer_id" IS
+'Foreign Key referencing VIEW_CUSTOMERS(customer_id). Identifies the customer who placed the order';
+COMMENT ON COLUMN VIEW_ORDERS."order_date" IS
 'Timestamp when the order was placed';
-COMMENT ON COLUMN "view_orders"."total_amount" IS 
+COMMENT ON COLUMN VIEW_ORDERS."total_amount" IS
 'Total value of the order in USD including tax';
-COMMENT ON COLUMN "view_orders"."status" IS 
+COMMENT ON COLUMN VIEW_ORDERS."status" IS
 'Order status: PENDING, SHIPPED, DELIVERED, or CANCELLED';
 
 ```
@@ -868,7 +874,9 @@ Select AI는 두 가지 방식으로 Iceberg 테이블을 지원합니다:
 
 #### 3.3.4 방법 1: AWS Glue Catalog를 사용한 Iceberg 연결
 
-**Step 1: AWS Glue 접근을 위한 Credential 생성**
+**Step 1: AWS S3 접근을 위한 Credential 생성**
+
+> **주의:** S3 버킷이 Public이라도 `ANONYMOUS` credential로는 접근할 수 없습니다. 반드시 **실제 AWS Access Key/Secret Key**가 필요합니다. 교육 시 강사로부터 Key를 전달받으세요.
 
 ```sql
 -- NORTHWIND 사용자로 실행:
@@ -1178,7 +1186,8 @@ streamlit run app.py
 |------|------|-----------|
 | 잘못된 테이블/컬럼 참조 | View에 COMMENT 미작성 | View에 `COMMENT ON TABLE/COLUMN` 추가. 특히 Database Link 통해 연결된 외부 테이블은 View + COMMENT 필수 |
 | LLM이 Database Link 구문 직접 생성 시도 | AI 프로파일의 `object_list`에 원본 테이블 등록 | 반드시 **View 이름**을 `object_list`에 등록. `@DB_LINK` 직접 참조 대신 View 사용 |
-| 연합 쿼리에서 조인 실패 | 테이블 간 관계 정보 부족 | COMMENT에 Foreign Key 관계를 명시 (예: "Foreign key to the customers table") |
+| 연합 쿼리에서 조인 실패 또는 `ORA-01010` | View COMMENT에 PK/FK 관계 정보 부족 | DB Link View는 Oracle 내부에 제약조건이 없으므로, **COMMENT에 Primary Key/Foreign Key 및 참조 테이블 관계를 반드시 명시**해야 함. 예: `'Primary Key: order_id. Foreign Key: customer_id references VIEW_CUSTOMERS(customer_id)'` |
+| `ORA-00942` (PostgreSQL View COMMENT 시) | Oracle은 큰따옴표 없이 생성한 객체를 대문자로 저장하므로, COMMENT 시 `"view_customers"` (소문자)로 참조하면 찾지 못함 | 테이블명은 큰따옴표 없이 대문자로 참조: `COMMENT ON TABLE VIEW_CUSTOMERS IS ...`. 컬럼명은 PostgreSQL에서 소문자로 넘어오므로 큰따옴표 유지: `VIEW_CUSTOMERS."customer_id"` |
 
 ### 3. Iceberg 관련 오류
 

@@ -1,0 +1,9 @@
+# 크레덴셜 포함 파일
+.env
+교육_수행기록*.md
+
+# IDE / OS
+.DS_Store
+.claude/
+__pycache__/
+*.pyc

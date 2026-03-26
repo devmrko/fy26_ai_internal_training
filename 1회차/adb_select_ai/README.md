@@ -439,25 +439,27 @@ API Key 관리 없이 IAM 권한으로 인증하는 가장 안전한 방식입�
     Allow dynamic-group ADB_Dynamic_Group to manage generative-ai-family in compartment <Your_Compartment_Name>
     ```
 
-**3단계: Resource Principal 사용**
+**3단계: Resource Principal 활성화 (ADMIN 계정으로 실행)**
   - Resource Principal은 **별도의 credential 생성이 필요 없습니다**
   - Oracle ADB는 `OCI$RESOURCE_PRINCIPAL`이라는 예약된 이름을 자동으로 인식합니다
-  - Dynamic Group과 Policy 설정만 완료하면 바로 사용 가능
+  - 단, **ADMIN 계정에서 사용자별로 Resource Principal을 활성화**해야 합니다
 
-**주의사항:**
+```sql
+-- [작업 위치] ADMIN 계정으로 실행
+-- Resource Principal 활성화 (ADMIN 자신)
+EXEC DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL();
+
+-- NORTHWIND 사용자에 대해서도 활성화
+EXEC DBMS_CLOUD_ADMIN.ENABLE_RESOURCE_PRINCIPAL(username => 'NORTHWIND');
+```
+
+> **주의:** 이 단계를 생략하면 이후 프로파일 생성 시 `ORA-20004: Credential "NORTHWIND"."OCI$RESOURCE_PRINCIPAL" does not exist` 오류가 발생합니다.
+
+**참고사항:**
 - `OCI$RESOURCE_PRINCIPAL`은 Oracle이 예약한 특별한 이름 ($ 기호 포함)
-- DBMS_CLOUD.CREATE_CREDENTIAL로 생성하지 않음
+- `DBMS_CLOUD.CREATE_CREDENTIAL`로 별도 생성하지 않음 (ENABLE_RESOURCE_PRINCIPAL이 자동 처리)
 - OCI 리소스(ADB) 내부에서만 작동
 - Dynamic Group과 Policy가 올바르게 설정되어 있어야 함
-```sql
-BEGIN
-  DBMS_CLOUD.CREATE_CREDENTIAL(
-    credential_name => 'GENAI_RP_CRED',
-    username        => 'OCI$RESOURCE_PRINCIPAL',
-    password        => 'NULL'
-  );
-END;
-```
 
 **Case A-2: OCI GenAI (API Key 방식 - Private Key 사용)**
 특정 OCI 사용자 계정의 API Key를 사용하여 인증합니다. 로컬 개발 환경에서 주로 사용됩니다. 
