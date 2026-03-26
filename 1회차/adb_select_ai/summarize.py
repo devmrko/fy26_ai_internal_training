@@ -40,8 +40,6 @@ select_ai.connect(
 )
 print("Connected securely using Wallet")
 
-from select_ai import SyntheticDataAttributes, SyntheticDataParams 
-
 profile = select_ai.Profile(profile_name="NORTHWIND_AI")
 
 print("\n=== 요약 및 번역 테스트 ===\n")
