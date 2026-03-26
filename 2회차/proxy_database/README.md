@@ -508,7 +508,7 @@ BEGIN
                         "object_list": [
                             {"owner": "NORTHWIND", "name": "VIEW_RDS_CUSTOMERS"},
                             {"owner": "NORTHWIND", "name": "VIEW_RDS_ORDERS"},
-                            {"owner": "NORTHWIND", "name": "products_cache"},
+                            {"owner": "NORTHWIND", "name": "PRODUCTS_CACHE"},
                             {"owner": "NORTHWIND", "name": "customer_tiers"}
                         ]}'
   );
@@ -803,9 +803,9 @@ BEGIN
                         "model": "meta.llama-4-maverick-17b-128e-instruct-fp8",
                         "credential_name": "OCI_KEY_CRED",
                         "object_list": [
-                            {"owner": "NORTHWIND", "name": "view_customers"},
-                            {"owner": "NORTHWIND", "name": "view_orders"},
-                            {"owner": "NORTHWIND", "name": "view_products"}
+                            {"owner": "NORTHWIND", "name": "VIEW_CUSTOMERS"},
+                            {"owner": "NORTHWIND", "name": "VIEW_ORDERS"},
+                            {"owner": "NORTHWIND", "name": "VIEW_PRODUCTS"}
                         ]}'
   );
 END;
@@ -892,6 +892,8 @@ END;
 
 ```
 
+**Step 2: External Table 생성**
+
 ```sql
 -- NORTHWIND 사용자로 실행:
 BEGIN
@@ -905,7 +907,7 @@ END;
 /
 ```
 
-**Step 1.5: Directory 권한 설정 (중요!)**
+**Step 2.1: Directory 권한 설정 (중요!)**
 
 External Table 생성 시 `DATA_PUMP_DIR` 디렉토리에 대한 읽기/쓰기 권한이 필요합니다.
 

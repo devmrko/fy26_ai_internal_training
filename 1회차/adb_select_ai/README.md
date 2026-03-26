@@ -324,7 +324,7 @@ COMMENT ON COLUMN ORDERS.REQUIRED_DATE IS 'Date when the order is required.';
 COMMENT ON COLUMN ORDERS.SHIPPED_DATE IS 'Date when the order was shipped.';
 COMMENT ON COLUMN ORDERS.SHIP_VIA IS 'Shipping method identifier.';
 COMMENT ON COLUMN ORDERS.FREIGHT IS 'Shipping cost.';
-COMMENT ON COLUMN ORDERS.SHIP_NAME IS 'Name of the shipping contact/';
+COMMENT ON COLUMN ORDERS.SHIP_NAME IS 'Name of the shipping contact.';
 COMMENT ON COLUMN ORDERS.SHIP_ADDRESS IS 'Shipping address.';
 COMMENT ON COLUMN ORDERS.SHIP_CITY IS 'Shipping city.';
 COMMENT ON COLUMN ORDERS.SHIP_REGION IS 'Shipping region/state.';
@@ -620,7 +620,7 @@ ORDER BY attribute_name;
 ```
 ATTRIBUTE_NAME      ATTRIBUTE_VALUE
 ------------------- --------------------------------------------------
-comments            false
+comments            true
 credential_name     OCI$RESOURCE_PRINCIPAL (또는 OCI_KEY_CRED)
 model               meta.llama-4-maverick-17b-128e-instruct-fp8
 object_list         [{"owner":"NORTHWIND","name":"CATEGORIES"}...]
@@ -1327,7 +1327,7 @@ def get_sql_for_question(question, profile_name):
         conn.commit()
         
         # Get SQL
-        cursor.execute(f"SELECT AI showsql {question}")
+        cursor.execute(f"SELECT AI showsql '{question}'")
         result = cursor.fetchone()
         
         cursor.close()
