@@ -70,36 +70,40 @@ def get_ai_profile(profile_name):
         return None
 
 
+def _get_connection():
+    """Oracle ADB에 직접 연결을 생성합니다 (with문과 함께 사용)."""
+    return oracledb.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        dsn=DB_DSN,
+        config_dir=WALLET_DIR,
+        wallet_location=WALLET_DIR,
+        wallet_password=WALLET_PASSWORD
+    )
+
+
 def get_sql_for_question(question, profile_name):
     """자연어 질문을 SQL로 변환합니다 (SELECT AI showsql 사용)."""
     try:
-        # oracledb로 직접 연결하여 SELECT AI showsql 실행
-        conn = oracledb.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            dsn=DB_DSN,
-            config_dir=WALLET_DIR,
-            wallet_location=WALLET_DIR,
-            wallet_password=WALLET_PASSWORD
-        )
-        cursor = conn.cursor()
+        # with문으로 연결 관리 (에러 발생 시에도 자동으로 연결 종료)
+        with _get_connection() as conn:
+            with conn.cursor() as cursor:
+                # 사용할 AI 프로파일 활성화
+                cursor.execute(f"""
+                    BEGIN
+                        DBMS_CLOUD_AI.SET_PROFILE(profile_name => '{profile_name}');
+                    END;
+                """)
+                conn.commit()
 
-        # 사용할 AI 프로파일 활성화
-        cursor.execute(f"""
-            BEGIN
-                DBMS_CLOUD_AI.SET_PROFILE(profile_name => '{profile_name}');
-            END;
-        """)
-        conn.commit()
+                # 작은따옴표 이스케이프 (예: "What's" → "What''s")
+                safe_question = question.replace("'", "''")
 
-        # 자연어 -> SQL 변환 (showsql: SQL만 반환, 실행하지 않음)
-        cursor.execute(f"SELECT AI showsql '{question}'")
-        result = cursor.fetchone()
+                # 자연어 -> SQL 변환 (showsql: SQL만 반환, 실행하지 않음)
+                cursor.execute(f"SELECT AI showsql '{safe_question}'")
+                result = cursor.fetchone()
 
-        cursor.close()
-        conn.close()
-
-        return result[0] if result and result[0] else None
+                return result[0] if result and result[0] else None
     except Exception as e:
         st.error(f"SQL 생성 실패: {e}")
         return None
@@ -108,27 +112,17 @@ def get_sql_for_question(question, profile_name):
 def execute_sql(sql):
     """SQL을 실행하고 결과를 pandas DataFrame으로 반환합니다."""
     try:
-        conn = oracledb.connect(
-            user=DB_USER,
-            password=DB_PASSWORD,
-            dsn=DB_DSN,
-            config_dir=WALLET_DIR,
-            wallet_location=WALLET_DIR,
-            wallet_password=WALLET_PASSWORD
-        )
-        cursor = conn.cursor()
-        cursor.execute(sql)
+        with _get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(sql)
 
-        rows = cursor.fetchall()
-        # 컬럼 이름 추출
-        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                rows = cursor.fetchall()
+                # 컬럼 이름 추출
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
 
-        cursor.close()
-        conn.close()
-
-        if rows and columns:
-            return pd.DataFrame(rows, columns=columns)
-        return None
+                if rows and columns:
+                    return pd.DataFrame(rows, columns=columns)
+                return None
     except Exception as e:
         st.error(f"SQL 실행 실패: {e}")
         return None
