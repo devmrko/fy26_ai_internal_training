@@ -36,11 +36,62 @@ SELECT USER || '_AI' AS PROFILE_NAME FROM DUAL;
 | SQL Tool 질문 | 정상 응답 |
 | PL/SQL RMA Tool 호출 | 영어/한국어 반품 요청 모두 정상 호출 |
 | Ask Oracle 공식 APEX 앱 | App ID `108`, Alias `ASKORACLE` 설치 완료 |
+| 수강생 환경 복구 | `sql/oapc_train_bootstrap_select_ai.sql`을 `TRAIN05`에서 실행 검증 |
 
 CLI(sqlplus/sqlcl)로 한국어를 실행할 때는 클라이언트 문자셋을 UTF-8로 맞춰야 합니다. Database Actions에서는 보통 별도 설정이 필요 없습니다.
 
 ```bash
 export NLS_LANG=KOREAN_KOREA.AL32UTF8
+```
+
+## 0단계: 수강생 환경 복구
+
+1회차 교육을 들었더라도 수강생이 테이블이나 AI Profile을 삭제했으면 2회차 실습 시작 전에 복구가 필요합니다. 현장에서는 긴 README를 다시 따라가게 하지 말고 아래 스크립트로 복구합니다.
+
+강사가 ADMIN으로 1회 실행:
+
+```sql
+@2회차/adb_select_ai_agent/sql/oapc_admin_prepare_train_users.sql
+```
+
+수강생이 본인 `TRAINxx` 계정으로 실행:
+
+```sql
+@2회차/adb_select_ai_agent/sql/oapc_train_bootstrap_select_ai.sql
+```
+
+Database Actions SQL Worksheet만 사용하는 수강생은 `@파일경로`를 사용할 수 없으므로, 해당 SQL 파일 내용을 열어 전체 복사한 뒤 **Run Script**로 실행합니다.
+
+이 bootstrap 스크립트가 수행하는 일:
+
+| 항목 | 내용 |
+|------|------|
+| 테이블 | `CATEGORIES`, `CUSTOMERS`, `PRODUCTS`, `ORDERS`, `ORDER_DETAILS`가 없으면 생성 |
+| 데이터 | 필수 Northwind 샘플 행을 `MERGE`로 보강. 기존 행은 삭제하지 않음 |
+| Comment/Annotation | Select AI가 읽을 테이블/컬럼 설명 보강 |
+| AI Profile | 현재 사용자 기준 `TRAINxx_AI`를 `xai.grok-4.3`으로 재생성 |
+| 검증 | 테이블별 row count와 Profile 속성 출력 |
+
+테이블 구조가 잘못 만들어져 bootstrap이 실패하면, 해당 수강생 계정에서 아래 reset block으로 실습 객체만 지운 뒤 bootstrap을 다시 실행합니다.
+
+```sql
+BEGIN
+  FOR t IN (
+    SELECT 'ORDER_DETAILS' table_name FROM dual UNION ALL
+    SELECT 'ORDERS' FROM dual UNION ALL
+    SELECT 'PRODUCTS' FROM dual UNION ALL
+    SELECT 'CUSTOMERS' FROM dual UNION ALL
+    SELECT 'CATEGORIES' FROM dual UNION ALL
+    SELECT 'RETURNS' FROM dual
+  ) LOOP
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE ' || t.table_name || ' CASCADE CONSTRAINTS PURGE';
+    EXCEPTION
+      WHEN OTHERS THEN NULL;
+    END;
+  END LOOP;
+END;
+/
 ```
 
 ## 최신 기능 반영 포인트
@@ -248,6 +299,15 @@ FETCH FIRST 5 ROWS ONLY;
 ## Ask Oracle Demo 연결
 
 공식 Ask Oracle APEX 설치 가이드는 `README.md`의 부록을 참고합니다.
+
+설치 절차 판단:
+
+| 구분 | 판단 |
+|------|------|
+| 공식 설치 메뉴얼 | Oracle DevRel GitHub의 `Ask Oracle App Installation Steps.pdf`와 APEX App Builder Import 방식이 기준 |
+| 현재 README의 App Builder 절차 | 공식 메뉴얼 방향과 맞음 |
+| 현재 README의 SQLPlus 절차 | 공식 export를 반복 설치하기 위한 강사용 자동화 절차. `sql/oapc_ask_oracle_install_context.sql`로 분리 |
+| 현장 운영 | 참석자별 설치가 아니라 강사용 공식 앱 공유 데모로 진행 |
 
 강사용 데모 URL:
 

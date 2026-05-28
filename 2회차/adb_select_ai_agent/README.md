@@ -27,6 +27,10 @@ adb_select_ai_agent/
 ├── README.md              # 본 교육 문서 (현재 파일)
 ├── Select_AI_Latest_Updates_2026_05.md  # 최신 기능/공식 자료 체크리스트
 ├── OAPC_3rd_Field_Practice_Guide.md     # OAPC 3차 현장 실습 기준
+├── sql/
+│   ├── oapc_admin_prepare_train_users.sql    # 강사용 TRAINxx 계정/권한 준비
+│   ├── oapc_train_bootstrap_select_ai.sql    # 수강생용 Northwind/Profile 복구
+│   └── oapc_ask_oracle_install_context.sql   # Ask Oracle SQLPlus import context
 ├── .env.example           # 환경 변수 템플릿 (복사하여 .env 생성)
 ├── .env                   # 실제 환경 변수 (git에 포함되지 않음)
 ├── .gitignore             # git 제외 파일 목록
@@ -1747,10 +1751,20 @@ Ask Oracle은 Oracle Machine Learning 블로그에서 소개한 공식 APEX 샘�
 ```text
 https://blogs.oracle.com/machinelearning/try-the-new-ask-oracle-chatbot-powered-by-select-ai
 https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2026-03-04.sql
+https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/Ask%20Oracle%20App%20Installation%20Steps.pdf
 https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/apex/Ask-Oracle
 ```
 
 2026-05-28 기준 공식 GitHub 폴더에는 APEX export SQL, 설치 PDF, README가 같이 제공됩니다. OAPC 강사용 데모는 해당 공식 export를 import한 앱이며, 별도로 만든 커스텀 APEX wrapper가 아닙니다.
+
+설치 방식 판단:
+
+| 방식 | 용도 | 권장 |
+|------|------|------|
+| APEX App Builder Import | Oracle 공식 설치 PDF와 동일한 수동 설치 방식 | 최초 설치 또는 화면 설명용 |
+| SQLPlus Import | 강사용 반복 설치/재설치 자동화 방식 | 이미 검증된 데모 환경 재구성용 |
+
+참석자 전원이 Ask Oracle을 각자 설치할 필요는 없습니다. OAPC 3차에서는 강사용 `TRAIN05` parsing schema에 설치된 공식 Ask Oracle 앱을 공유 데모로 사용하고, 수강생은 SQL Worksheet에서 Agent 객체를 직접 만드는 흐름에 집중합니다.
 
 #### 강사용 설치 결과
 
@@ -1859,6 +1873,10 @@ sqlplus TRAIN05/"<PASSWORD>"@d8aukro81636mon0_low
 SQLPlus 안에서 실행합니다.
 
 ```sql
+@2회차/adb_select_ai_agent/sql/oapc_ask_oracle_install_context.sql
+
+-- SQLPlus 실행 위치가 repository root가 아니면 절대 경로로 실행하세요.
+-- 또는 아래 context block을 직접 실행해도 됩니다.
 BEGIN
   apex_application_install.set_workspace('OAPC_DEMO');
   apex_application_install.set_application_id(108);
