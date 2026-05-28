@@ -43,6 +43,31 @@ CLI(sqlplus/sqlcl)로 한국어를 실행할 때는 클라이언트 문자셋을
 export NLS_LANG=KOREAN_KOREA.AL32UTF8
 ```
 
+## 최신 기능 반영 포인트
+
+상세 검색 결과와 공식 자료 링크는 [Select_AI_Latest_Updates_2026_05.md](./Select_AI_Latest_Updates_2026_05.md)에 분리했습니다. 현장에서는 아래 항목만 짧게 짚고, 실습 시간은 SQL Tool/PLSQL Tool/Ask Oracle에 집중합니다.
+
+| 주제 | 현장 반영 |
+|------|-----------|
+| 26ai / 19c 기능 차이 | AI Agent는 공통 축으로 설명하고, RAG/Vector Search/Auto Object Selection은 26ai 중심 확장 기능으로 소개 |
+| Ask Oracle v4 | 공식 APEX 샘플 앱으로 NL2SQL, Chart, Agent Team을 시연 |
+| MCP Server | 오늘 만든 Tool을 MCP client에 노출할 수 있는 후속 확장으로 설명. 이번 3차 실습에는 포함하지 않음 |
+| Pre-built AI Agents | 고객 PoC를 빠르게 시작할 수 있는 예제 카탈로그로 소개 |
+| VPD/RAS 보안 | LLM이 SQL을 생성해도 최종 접근 제어는 DB 권한과 보안 정책이 통제한다는 메시지 강조 |
+| PL/SQL wrapper pattern | 기존 업무 프로시저가 여러 OUT 값을 반환하면 wrapper function으로 JSON 결과를 만들어 Tool에 연결 |
+
+## 권장 진행 순서
+
+| 시간 | 내용 |
+|------|------|
+| 0-10분 | 최신 업데이트 맵과 오늘 실습 범위 정리 |
+| 10-65분 | 빠른 실행 SQL로 Tool/Task/Agent/Team 구성 |
+| 65-85분 | SQL Worksheet에서 Agent SQL 조회와 RMA Tool 호출 검증 |
+| 85-115분 | Ask Oracle 공식 APEX 앱으로 NL2SQL/Chart/Agent Team 시연 |
+| 115-135분 | MCP, VPD, Pre-built Agents, RAG 확장 설명 |
+| 135-170분 | 수강생 계정별 이슈 해결 및 반복 실습 |
+| 170-180분 | 정리와 Q&A |
+
 ## 강사용 사전 권한 부여 SQL
 
 수강생 계정에서 `DBMS_CLOUD_AI_AGENT must be declared`가 발생하면 ADMIN 계정으로 아래 권한을 부여합니다.
@@ -242,3 +267,17 @@ Ask Oracle에서 사용할 값:
 |------|-----|
 | NL2SQL Profile | `TRAIN05_AI` |
 | Agent Team | `NORTHWIND_SUPPORT_TEAM` |
+
+권장 질문:
+
+```text
+가장 비싼 제품 3개와 가격을 알려줘.
+```
+
+```text
+카테고리별 상품 수를 막대 차트로 보여줘.
+```
+
+```text
+주문번호 10248 상품이 파손되었습니다. 반품 승인번호를 생성해 주세요.
+```

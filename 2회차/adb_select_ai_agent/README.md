@@ -19,10 +19,14 @@
 
 > **OAPC 3차 현장 실습 기준(2026-05-29)**: 파트너 교육 환경에서는 `NORTHWIND` 대신 배정된 `TRAINxx` 계정을 사용합니다. 현장 기준과 빠른 실행 SQL은 [OAPC_3rd_Field_Practice_Guide.md](./OAPC_3rd_Field_Practice_Guide.md)를 참고하세요.
 
+> **최신 업데이트 체크리스트(2026-05-28)**: 26ai/19c 기능 차이, Ask Oracle v4, MCP Server, Pre-built AI Agents, VPD 보안 메시지는 [Select_AI_Latest_Updates_2026_05.md](./Select_AI_Latest_Updates_2026_05.md)에 별도로 정리했습니다.
+
 #### 프로젝트 파일 구조
 ```
 adb_select_ai_agent/
 ├── README.md              # 본 교육 문서 (현재 파일)
+├── Select_AI_Latest_Updates_2026_05.md  # 최신 기능/공식 자료 체크리스트
+├── OAPC_3rd_Field_Practice_Guide.md     # OAPC 3차 현장 실습 기준
 ├── .env.example           # 환경 변수 템플릿 (복사하여 .env 생성)
 ├── .env                   # 실제 환경 변수 (git에 포함되지 않음)
 ├── .gitignore             # git 제외 파일 목록
@@ -52,12 +56,13 @@ adb_select_ai_agent/
 - **Step 8**: 실전 응용 예제
 
 #### [부록]
+- 최신 업데이트 체크리스트: [Select_AI_Latest_Updates_2026_05.md](./Select_AI_Latest_Updates_2026_05.md)
 - OAPC 3차 현장 실습 가이드: [OAPC_3rd_Field_Practice_Guide.md](./OAPC_3rd_Field_Practice_Guide.md)
 - Ask Oracle(APEX) 설치 및 Demo 가이드
 - Python Streamlit 앱 실행 가이드
 - 트러블슈팅
 
-**지원 Tool 유형**: SQL, PL/SQL, RAG, WebSearch, Notification
+**지원 Tool 유형**: SQL, PL/SQL, RAG, WebSearch, Notification. MCP Server는 별도 Tool 타입이 아니라 생성된 Agent Tool을 MCP client에 노출하는 운영 방식입니다.
 
 ---
 
@@ -105,7 +110,7 @@ adb_select_ai_agent/
 | **SQL Tool** | `SQL` | NL2SQL을 통한 데이터 조회 | "고객 목록 보여줘" |
 | **RAG Tool** | `RAG` | 벡터 검색으로 문서 검색 | "제품 매뉴얼에서 A/S 정책 찾아줘" |
 | **PL/SQL Tool** | `function` | 커스텀 프로시저/함수 실행 | 재고 업데이트, 주문 생성 |
-| **WebSearch Tool** | `WEBSEARCH` | openai를 이용한 웹검색 | 최신 환율, 제품 가격 조회 |
+| **WebSearch Tool** | `WEBSEARCH` | credential 기반 웹 검색(OpenAI 등) | 최신 환율, 제품 가격 조회 |
 | **Notification Tool** | `NOTIFICATION` | 이메일/Slack 알림 (OCI SMTP 이용) | 알림, 리포트 전송 |
 
 **하나의 작업에서 여러 tool를 순차적으로 조합:**
@@ -639,6 +644,8 @@ ORDER BY t.tool_name, a.attribute_name;
 - `description`: tool를 식별하는 데 도움이 되는 사용자 정의 설명
   - **LLM에 전송되지 않음** (데이터베이스에만 저장)
   - 관리 및 문서화 목적
+
+> 실무 확장 패턴: 기존 PL/SQL 프로시저가 여러 `OUT` 파라미터를 반환하는 경우, 원본 프로시저를 그대로 두고 wrapper function을 만들어 JSON 문자열 하나로 반환하는 구성이 안정적입니다. Agent Tool에는 wrapper function을 등록하고, 원본 프로시저 호출/예외 처리/결과 구조화는 wrapper 안에 캡슐화합니다.
 
 ---
 
@@ -1270,6 +1277,8 @@ ORDER BY CREATED DESC;
 
 Select AI Agent는 SQL/PL/SQL 외에도 다양한 내장 tool를 지원합니다.
 
+> 버전 주의: 2026-05 기준 Oracle의 Select AI 기능 매트릭스에서는 19c와 26ai 모두 AI Agent를 지원하지만, RAG/Vector Search와 Auto Object Selection 같은 고급 기능은 26ai 중심으로 정리되어 있습니다. 현장 실습 DB에서 Vector Index가 준비되지 않았으면 RAG는 개념 설명만 하고 SQL/PLSQL/Ask Oracle 흐름을 우선 진행합니다.
+
 ##### 7.1 RAG Tool (문서 검색)
 
 **사용 사례**: 제품 매뉴얼, FAQ, 정책 문서 검색
@@ -1343,7 +1352,7 @@ END;
 
 ##### 7.2 WebSearch Tool (인터넷 검색)
 
-**사용 사례**: 최신 정보, 환율, 경쟁사 정보 조회, openai를 사용해서 호출해야 함
+**사용 사례**: 최신 정보, 환율, 경쟁사 정보 조회. WebSearch Tool에는 외부 검색 API credential이 필요하며, 아래 예시는 OpenAI credential 기준입니다.
 
 ```sql
 -- ===============================================
@@ -1738,7 +1747,10 @@ Ask Oracle은 Oracle Machine Learning 블로그에서 소개한 공식 APEX 샘�
 ```text
 https://blogs.oracle.com/machinelearning/try-the-new-ask-oracle-chatbot-powered-by-select-ai
 https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2026-03-04.sql
+https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/apex/Ask-Oracle
 ```
+
+2026-05-28 기준 공식 GitHub 폴더에는 APEX export SQL, 설치 PDF, README가 같이 제공됩니다. OAPC 강사용 데모는 해당 공식 export를 import한 앱이며, 별도로 만든 커스텀 APEX wrapper가 아닙니다.
 
 #### 강사용 설치 결과
 
