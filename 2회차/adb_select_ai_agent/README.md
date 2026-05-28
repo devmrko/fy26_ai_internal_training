@@ -17,6 +17,8 @@
 ```
 > **전제 조건**: 1회차에서 생성한 NORTHWIND 사용자, 테이블, AI 프로파일(`NORTHWIND_AI`)이 필요합니다.
 
+> **OAPC 3차 현장 실습 기준(2026-05-29)**: 파트너 교육 환경에서는 `NORTHWIND` 사용자를 새로 만들지 않고, 배정된 `TRAINxx` 계정을 그대로 사용합니다. AI 프로파일명도 `NORTHWIND_AI`가 아니라 `TRAINxx_AI`입니다. 예를 들어 `TRAIN05`로 로그인했다면 프로파일은 `TRAIN05_AI`, object owner는 `TRAIN05`입니다.
+
 #### 프로젝트 파일 구조
 ```
 adb_select_ai_agent/
@@ -50,6 +52,7 @@ adb_select_ai_agent/
 - **Step 8**: 실전 응용 예제
 
 #### [부록]
+- Ask Oracle(APEX) 설치 및 Demo 가이드
 - Python Streamlit 앱 실행 가이드
 - 트러블슈팅
 
@@ -66,6 +69,216 @@ adb_select_ai_agent/
 - Oracle Autonomous Database 접근 권한
 - SQL 기본 지식
 - NORTHWIND_AI 프로파일 생성 완료 (1회차 실습)
+
+---
+
+### OAPC 3차 현장 실습 기준
+
+#### 실습 계정 규칙
+
+| 항목 | README 기본값 | OAPC 현장 실습값 |
+|------|---------------|------------------|
+| 스키마/사용자 | `NORTHWIND` | 배정받은 `TRAINxx` |
+| AI 프로파일 | `NORTHWIND_AI` | `TRAINxx_AI` |
+| Tool/Task/Agent/Team | 각 계정 안에 생성 | 각자 동일한 이름으로 생성 가능 |
+| SQL 실행 위치 | Database Actions SQL Worksheet 권장 | 동일 |
+
+현장 실습에서는 아래처럼 현재 로그인 사용자를 기준으로 프로파일명을 동적으로 잡으면 계정별 수정이 줄어듭니다.
+
+```sql
+-- 현재 계정이 TRAIN05이면 TRAIN05_AI 반환
+SELECT USER || '_AI' AS PROFILE_NAME FROM DUAL;
+```
+
+#### 현장 검증 결과
+
+2026-05-28 기준으로 다음 경로를 실제 DB에서 검증했습니다.
+
+| 검증 항목 | 결과 |
+|----------|------|
+| `TRAIN05` 접속 | 정상 |
+| `TRAIN05_AI` 프로파일 | `ENABLED` |
+| Northwind 핵심 테이블 | `CATEGORIES`, `PRODUCTS`, `CUSTOMERS`, `ORDERS`, `ORDER_DETAILS` 확인 |
+| Agent 권한 | `DBMS_CLOUD_AI_AGENT`, `DBMS_CLOUD_AI`, `DBMS_LOB` 권한 필요 |
+| SQL Tool 질문 | 정상 응답 |
+| PL/SQL RMA Tool 호출 | 영어/한국어 반품 요청 모두 정상 호출 |
+
+> CLI(sqlplus/sqlcl)로 한국어를 실행할 때는 클라이언트 문자셋을 UTF-8로 맞춰야 합니다. Database Actions에서는 보통 별도 설정이 필요 없습니다.
+
+```bash
+export NLS_LANG=KOREAN_KOREA.AL32UTF8
+```
+
+#### 강사용 사전 권한 부여 SQL
+
+수강생 계정에서 `DBMS_CLOUD_AI_AGENT must be declared`가 발생하면 ADMIN 계정으로 아래 권한을 부여합니다.
+
+```sql
+GRANT EXECUTE ON C##CLOUD$SERVICE.DBMS_CLOUD_AI_AGENT TO <TRAIN_USER>;
+GRANT EXECUTE ON C##CLOUD$SERVICE.DBMS_CLOUD_AI TO <TRAIN_USER>;
+GRANT EXECUTE ON DBMS_LOB TO <TRAIN_USER>;
+
+GRANT SELECT ON DBA_AI_AGENT_TASKS TO <TRAIN_USER>;
+GRANT SELECT ON DBA_AI_AGENT_TASK_ATTRIBUTES TO <TRAIN_USER>;
+GRANT SELECT ON DBA_AI_AGENT_TOOLS TO <TRAIN_USER>;
+GRANT SELECT ON DBA_AI_AGENT_TOOL_ATTRIBUTES TO <TRAIN_USER>;
+GRANT SELECT ON DBA_AI_AGENT_TEAMS TO <TRAIN_USER>;
+GRANT SELECT ON DBA_AI_AGENT_TEAM_ATTRIBUTES TO <TRAIN_USER>;
+```
+
+#### 현장용 빠른 실행 SQL
+
+아래 블록은 `TRAINxx` 계정으로 로그인한 상태에서 실행합니다. `USER || '_AI'`를 사용하므로 계정별로 `TRAIN05_AI` 같은 값을 직접 바꾸지 않아도 됩니다.
+
+```sql
+-- ===============================================
+-- OAPC 3차 검증 완료 빠른 실행 스크립트
+-- 실행 계정: TRAINxx
+-- 전제조건: TRAINxx_AI 프로파일과 Northwind 5개 테이블 존재
+-- ===============================================
+
+CREATE OR REPLACE FUNCTION run_team_clob (
+    p_team_name   IN VARCHAR2,
+    p_user_prompt IN VARCHAR2,
+    p_params      IN CLOB
+) RETURN CLOB
+AS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    l_answer CLOB;
+BEGIN
+    l_answer := DBMS_CLOUD_AI_AGENT.RUN_TEAM(
+        team_name   => p_team_name,
+        user_prompt => p_user_prompt,
+        params      => p_params
+    );
+    COMMIT;
+    RETURN l_answer;
+END;
+/
+
+DECLARE
+  e_exists EXCEPTION;
+  PRAGMA EXCEPTION_INIT(e_exists, -955);
+BEGIN
+  EXECUTE IMMEDIATE q'[
+    CREATE TABLE returns (
+      return_id       NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      rma_number      VARCHAR2(50) NOT NULL UNIQUE,
+      order_id        NUMBER NOT NULL,
+      reason          VARCHAR2(500),
+      created_date    DATE DEFAULT SYSDATE NOT NULL,
+      status          VARCHAR2(20) DEFAULT 'PENDING',
+      processed_date  DATE,
+      refund_amount   NUMBER(10,2),
+      notes           VARCHAR2(1000)
+    )]';
+EXCEPTION
+  WHEN e_exists THEN NULL;
+END;
+/
+
+CREATE OR REPLACE FUNCTION generate_return (
+    p_order_id IN NUMBER,
+    p_reason   IN VARCHAR2
+) RETURN VARCHAR2 IS
+    v_rma_number VARCHAR2(100);
+BEGIN
+    v_rma_number := 'RMA-' || p_order_id || '-' ||
+                    SUBSTR(LOWER(p_reason), 1, 5) || '-' ||
+                    TRUNC(DBMS_RANDOM.VALUE(100, 999));
+
+    INSERT INTO returns (rma_number, order_id, reason, created_date)
+    VALUES (v_rma_number, p_order_id, p_reason, SYSDATE);
+
+    RETURN v_rma_number;
+END;
+/
+
+BEGIN DBMS_CLOUD_AI_AGENT.DROP_TEAM(team_name => 'Northwind_Support_Team', force => TRUE); EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN DBMS_CLOUD_AI_AGENT.DROP_AGENT('Northwind_Support_Bot'); EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN DBMS_CLOUD_AI_AGENT.DROP_TASK('Customer_Service_Task'); EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN DBMS_CLOUD_AI_AGENT.DROP_TOOL('SQL_Analysis_Tool'); EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN DBMS_CLOUD_AI_AGENT.DROP_TOOL('Return_Auth_Generator'); EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+DECLARE
+  l_profile VARCHAR2(128) := USER || '_AI';
+BEGIN
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name   => 'SQL_Analysis_Tool',
+    attributes  => '{"tool_type":"SQL","tool_params":{"profile_name":"' || l_profile || '"}}',
+    description => 'Queries products, orders, customers, and sales data using Select AI NL2SQL.'
+  );
+
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name   => 'Return_Auth_Generator',
+    attributes  => '{"instruction":"Use this tool to generate a Return Merchandise Authorization number when a customer wants to return a product. Required parameters: order_id number and reason string.","function":"generate_return"}',
+    description => 'Generates RMA numbers for product returns.'
+  );
+
+  DBMS_CLOUD_AI_AGENT.CREATE_TASK(
+    task_name => 'Customer_Service_Task',
+    attributes => '{"instruction":"You are a customer service agent for Northwind Traders. User request: {query}. Workflow: (1) For product/order/customer/inventory/sales lookup questions, use SQL_Analysis_Tool. (2) If the user asks for return, refund, RMA, 반품, 환불, or 반품 승인번호 and gives an order number, call Return_Auth_Generator. Extract order_id from the order number and set reason to the user stated reason such as defective, damaged, 파손, 불량. Do not only look up the order when a return authorization is requested. (3) If order_id is missing, ask for it. Answer in Korean unless the user asks otherwise.","tools":["SQL_Analysis_Tool","Return_Auth_Generator"],"enable_human_tool":true}'
+  );
+
+  DBMS_CLOUD_AI_AGENT.CREATE_AGENT(
+    agent_name => 'Northwind_Support_Bot',
+    attributes => '{"profile_name":"' || l_profile || '","role":"You are an experienced customer support representative for Northwind Traders. You are precise with database facts, careful about missing order details, and concise in customer-facing responses."}'
+  );
+
+  DBMS_CLOUD_AI_AGENT.CREATE_TEAM(
+    team_name  => 'Northwind_Support_Team',
+    attributes => '{"agents":[{"name":"Northwind_Support_Bot","task":"Customer_Service_Task"}],"process":"sequential"}'
+  );
+END;
+/
+
+SELECT tool_name, status FROM user_ai_agent_tools ORDER BY tool_name;
+SELECT task_name, status FROM user_ai_agent_tasks ORDER BY task_name;
+SELECT agent_name FROM user_ai_agents ORDER BY agent_name;
+SELECT agent_team_name, status FROM user_ai_agent_teams ORDER BY agent_team_name;
+```
+
+#### 검증 질문
+
+```sql
+DECLARE
+  l_res     CLOB;
+  l_conv_id VARCHAR2(100);
+BEGIN
+  l_conv_id := DBMS_CLOUD_AI.CREATE_CONVERSATION();
+  l_res := run_team_clob(
+             p_team_name   => 'Northwind_Support_Team',
+             p_user_prompt => '가장 비싼 제품 3개와 가격을 알려줘.',
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
+           );
+  DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
+END;
+/
+
+DECLARE
+  l_res     CLOB;
+  l_conv_id VARCHAR2(100);
+BEGIN
+  l_conv_id := DBMS_CLOUD_AI.CREATE_CONVERSATION();
+  l_res := run_team_clob(
+             p_team_name   => 'Northwind_Support_Team',
+             p_user_prompt => '주문번호 10248 상품이 파손되었습니다. 반품 승인번호를 생성해 주세요.',
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
+           );
+  DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
+END;
+/
+
+SELECT return_id, rma_number, order_id, reason, status, created_date
+FROM returns
+ORDER BY return_id DESC
+FETCH FIRST 5 ROWS ONLY;
+```
 
 ---
 
@@ -758,8 +971,8 @@ GROUP BY TOOL_NAME;
 
 | **TASK: Customer_Service_Task** |
 |:---|
-| **[지침]**<br>• 제품 문의 → SQL Tool 사용<br>• 반품 요청 → RMA Generator 사용<br>• 이메일 발송 → EMAIL_NOTIFY 사용<br>• 정보 부족 시 → 사용자에게 질문 |
-| **[사용 가능 tool]**<br>✓ SQL_Analysis_Tool<br>✓ Return_Auth_Generator<br>✓ EMAIL_NOTIFY<br>✓ Human_Tool (자동 활성화) |
+| **[지침]**<br>• 제품 문의 → SQL Tool 사용<br>• 반품 요청 → RMA Generator 사용<br>• 정보 부족 시 → 사용자에게 질문<br>• 이메일 발송은 Step 7.3 선택 실습에서 별도 구성 |
+| **[사용 가능 tool]**<br>✓ SQL_Analysis_Tool<br>✓ Return_Auth_Generator<br>✓ Human_Tool (자동 활성화)<br>✓ EMAIL_NOTIFY (Step 7.3 선택) |
 
 
 ##### 3.2 Task 생성
@@ -769,8 +982,8 @@ GROUP BY TOOL_NAME;
 -- Step 3: Customer Service Task 생성
 -- 설명: 고객 지원 업무를 정의하는 Task
 -- 실행 계정: NORTHWIND
--- 전제조건: SQL_Analysis_Tool, Return_Auth_Generator, EMAIL_NOTIFY tool가 생성되어 있어야 함
---          (EMAIL_NOTIFY 생성 방법은 Step 7.3 참조)
+-- 전제조건: SQL_Analysis_Tool, Return_Auth_Generator tool가 생성되어 있어야 함
+--          EMAIL_NOTIFY는 Step 7.3 선택 실습에서 별도 Task로 구성
 -- ===============================================
 -- ⚠️ 중요: instruction 텍스트에 반드시 {query} 플레이스홀더를 포함해야 합니다!
 -- {query}가 없으면 사용자 입력이 LLM에 전달되지 않아 오동작합니다.
@@ -787,11 +1000,13 @@ DECLARE
     v_attributes CLOB;
 BEGIN
     v_attributes := JSON_OBJECT(
-        'instruction' VALUE 'You are a customer service agent. deal with customer inquiry based on user request:{query}' ||
-                           '1. For product/order questions use SQL_Analysis_Tool ' ||
-                           '2. For sending email about the information using EMAIL_NOTIFY ' ||
-                           '3. Always be polite and professional',
-        'tools' VALUE JSON_ARRAY('SQL_Analysis_Tool', 'EMAIL_NOTIFY'),
+        'instruction' VALUE 'You are a customer service agent for Northwind Traders. User request: {query}. ' ||
+                           '1. For product/order/customer/inventory/sales lookup questions, use SQL_Analysis_Tool. ' ||
+                           '2. If the user asks for return, refund, RMA, 반품, 환불, or 반품 승인번호 and gives an order number, call Return_Auth_Generator. ' ||
+                           '3. Extract order_id from the order number and set reason to the user stated reason such as defective, damaged, 파손, 불량. ' ||
+                           '4. If order_id is missing, ask a concise follow-up question. ' ||
+                           '5. Answer in Korean unless the user asks otherwise.',
+        'tools' VALUE JSON_ARRAY('SQL_Analysis_Tool', 'Return_Auth_Generator'),
         'enable_human_tool' VALUE true
     );
     
@@ -1715,6 +1930,264 @@ FETCH FIRST 10 ROWS ONLY;
 
 ---
 
+### [부록] Ask Oracle(APEX) 공식 설치 및 Demo 가이드
+
+#### 설치 목적
+
+Ask Oracle은 Oracle Machine Learning 블로그에서 소개한 공식 APEX 샘플 앱입니다. 직접 APEX 페이지를 새로 만드는 예제가 아니라, Oracle DevRel이 배포하는 APEX export 파일을 import해서 사용하는 방식입니다.
+
+- Chat: 선택한 AI Profile의 LLM과 직접 대화
+- NL2SQL: 자연어 질문을 SQL로 변환하고 결과 확인
+- RAG: Vector Index가 설정된 AI Profile로 검색 증강 생성
+- AI Agent: Select AI Agent Team 실행
+- Explain, Conversation, Chart, Settings 등 데모용 UI 제공
+
+공식 자료:
+
+```text
+https://blogs.oracle.com/machinelearning/try-the-new-ask-oracle-chatbot-powered-by-select-ai
+https://github.com/oracle-devrel/oracle-autonomous-database-samples/blob/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2026-03-04.sql
+```
+
+#### 강사용 설치 결과
+
+2026-05-28 기준 OAPC 데모 환경에는 공식 Ask Oracle 앱을 아래 값으로 설치했습니다.
+
+| 항목 | 값 |
+|------|-----|
+| Workspace | `OAPC_DEMO` |
+| Parsing Schema | `TRAIN05` |
+| Application Name | `Ask Oracle` |
+| Application ID | `108` |
+| Application Alias | `ASKORACLE` |
+| Runtime URL | `https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/r/oapc_demo/askoracle/home` |
+| Application ID URL | `https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/r/oapc_demo/108/home` |
+| Settings URL | `https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/r/oapc_demo/askoracle/settings` |
+| 설치 검증 | `Ask Oracle powered by Select AI` 화면 표시 확인 |
+
+공식 앱 import 후 Supporting Objects로 다음 객체가 생성됩니다.
+
+| 객체 | 용도 |
+|------|------|
+| `ADB_CHAT` | Ask Oracle 내부 호출 패키지 |
+| `ADB_CHAT_PROMPTS` | Prompt/response 이력 |
+| `CONVERSATION_TIME` | 대화 실행 시간 기록 |
+| `PIN_CONVERSATIONS` | 고정 대화 목록 |
+| `ASK_ORACLE_AUTO_VISUAL_LOG` | 자동 시각화 결과 |
+
+#### 사전 조건
+
+- ADB에 APEX Workspace가 준비되어 있음
+- Workspace가 Ask Oracle을 설치할 parsing schema에 매핑되어 있음
+- parsing schema에서 Select AI Profile을 조회/실행할 수 있음
+- Agent 데모를 할 경우 Select AI Agent Team이 생성되어 있음
+- APEX 개발자 계정으로 App Builder import 가능
+
+OAPC 강사용 데모 기준:
+
+| 구분 | 값 |
+|------|-----|
+| APEX Workspace | `OAPC_DEMO` |
+| APEX/DB User | `TRAIN05` |
+| Select AI Profile | `TRAIN05_AI` |
+| 현재 모델 | `xai.grok-4.3` |
+| Agent Team | `NORTHWIND_SUPPORT_TEAM` |
+
+#### 1. 공식 APEX Export 다운로드
+
+공식 Ask Oracle export 파일은 약 59MB이므로 Git repository에 포함하지 않고 설치 시 다운로드합니다.
+
+```bash
+curl -L --fail \
+  -o /tmp/ADB-AskOracle-Chatbot-2026-03-04.sql \
+  https://raw.githubusercontent.com/oracle-devrel/oracle-autonomous-database-samples/main/apex/Ask-Oracle/ADB-AskOracle-Chatbot-2026-03-04.sql
+```
+
+#### 2. Workspace와 Schema 준비
+
+ADMIN 또는 APEX Instance Admin 권한으로 Workspace를 준비합니다.
+
+```sql
+BEGIN
+  APEX_INSTANCE_ADMIN.ADD_WORKSPACE(
+    p_workspace      => 'OAPC_DEMO',
+    p_primary_schema => 'TRAIN05'
+  );
+  COMMIT;
+END;
+/
+```
+
+Workspace 또는 매핑이 이미 있으면 중복 생성하지 말고 아래 SQL로 확인합니다.
+
+```sql
+SELECT workspace_name, schema, applications
+FROM apex_workspace_schemas
+WHERE workspace_name = 'OAPC_DEMO';
+```
+
+#### 3. App Builder에서 Import
+
+브라우저에서 APEX에 접속합니다.
+
+```text
+https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/apex
+```
+
+App Builder에서 다음 순서로 import합니다.
+
+1. App Builder → Import
+2. `ADB-AskOracle-Chatbot-2026-03-04.sql` 선택
+3. Parsing Schema: `TRAIN05`
+4. Install Supporting Objects: `Yes`
+5. Application ID는 자동 할당해도 되지만, 강사용 데모는 `108`로 설치
+6. Application Alias는 `ASKORACLE` 사용
+
+#### 4. SQLPlus로 Import
+
+반복 설치나 강사용 사전 구성은 SQLPlus import가 더 안정적입니다.
+
+```bash
+export NLS_LANG=KOREAN_KOREA.AL32UTF8
+export TNS_ADMIN=/path/to/Wallet_D8AUKRO81636MON0
+sqlplus TRAIN05/"<PASSWORD>"@d8aukro81636mon0_low
+```
+
+SQLPlus 안에서 실행합니다.
+
+```sql
+BEGIN
+  apex_application_install.set_workspace('OAPC_DEMO');
+  apex_application_install.set_application_id(108);
+  apex_application_install.set_application_alias('ASKORACLE');
+  apex_application_install.set_application_name('Ask Oracle');
+  apex_application_install.set_schema('TRAIN05');
+  apex_application_install.set_auto_install_sup_obj(true);
+END;
+/
+
+@/tmp/ADB-AskOracle-Chatbot-2026-03-04.sql
+```
+
+설치가 정상 완료되면 출력에 아래 메시지가 포함됩니다.
+
+```text
+Completed supporting objects install
+...done
+```
+
+#### 5. 설치 확인 SQL
+
+```sql
+SELECT workspace, application_id, application_name, alias, owner, authentication_scheme
+FROM apex_applications
+WHERE workspace = 'OAPC_DEMO'
+  AND application_id = 108;
+
+SELECT application_id, page_id, page_name, page_alias
+FROM apex_application_pages
+WHERE workspace = 'OAPC_DEMO'
+  AND application_id = 108
+ORDER BY page_id;
+
+SELECT object_name, object_type, status
+FROM user_objects
+WHERE object_name IN (
+  'ADB_CHAT',
+  'ADB_CHAT_PROMPTS',
+  'CONVERSATION_TIME',
+  'PIN_CONVERSATIONS',
+  'ASK_ORACLE_AUTO_VISUAL_LOG'
+)
+ORDER BY object_type, object_name;
+```
+
+기대 결과:
+
+| 항목 | 기대값 |
+|------|--------|
+| App ID | `108` |
+| Alias | `ASKORACLE` |
+| Home page | `HOME` |
+| Settings page | `SETTINGS` |
+| `ADB_CHAT` | `PACKAGE`, `PACKAGE BODY` 모두 `VALID` |
+
+#### 6. Ask Oracle 설정
+
+처음 실행 후 Settings에서 사용할 Profile과 Agent Team을 선택합니다.
+
+```text
+https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/r/oapc_demo/askoracle/settings
+```
+
+설정 값:
+
+| 설정 위치 | 선택 값 |
+|----------|---------|
+| Select AI Profile | `TRAIN05_AI` |
+| Agent Team | `NORTHWIND_SUPPORT_TEAM` |
+| Conversation Type | 데모 목적에 따라 `NL2SQL` 또는 `Agent Team` |
+
+Home 화면에서는 입력창 왼쪽의 `+` 버튼으로 모드를 선택합니다.
+
+| 모드 | 사용 값 | 데모 목적 |
+|------|---------|----------|
+| `NL2SQL` | `TRAIN05_AI` | 자연어 SQL 생성과 결과 조회 |
+| `Agent Team` | `NORTHWIND_SUPPORT_TEAM` | Tool/Task/Agent/Team 흐름 시연 |
+
+#### 7. 데모 질문
+
+NL2SQL 데모:
+
+```text
+가장 비싼 제품 3개와 가격을 알려줘.
+```
+
+```text
+카테고리별 상품 수를 알려줘.
+```
+
+```text
+카테고리별 상품 수를 막대 차트로 보여줘.
+```
+
+Agent Team 데모:
+
+```text
+주문번호 10248 상품이 파손되었습니다. 반품 승인번호를 생성해 주세요.
+```
+
+```text
+방금 생성한 반품 승인번호를 고객 응대 문장으로 정리해줘.
+```
+
+#### 8. 문제 해결
+
+| 증상 | 원인 | 해결 |
+|------|------|------|
+| `You have not selected any AI profile` | Settings에서 AI Profile 미선택 | Settings에서 `TRAIN05_AI` 선택 |
+| `You have not selected any agent team` | Agent Team 미선택 | Settings 또는 Home `+` 메뉴에서 `NORTHWIND_SUPPORT_TEAM` 선택 |
+| Profile 목록이 비어 있음 | parsing schema에 Select AI Profile 없음 | `TRAINxx_AI` 프로파일 생성 확인 |
+| Agent Team 목록이 비어 있음 | parsing schema에 Agent Team 없음 | `Northwind_Support_Team` 빠른 실행 SQL 재실행 |
+| `ADB_CHAT` invalid | Supporting Objects 설치 실패 | App 재import 시 Install Supporting Objects를 `Yes`로 선택 |
+| 응답이 느림 | Agent Team은 ReAct/tool 호출로 여러 LLM 호출 발생 | 빠른 데모는 `NL2SQL + TRAIN05_AI`, Agent는 RMA 예제 1~2개만 사용 |
+
+#### 9. 현재 모델 확인 및 변경
+
+현재 강사용 `TRAIN05_AI`는 `xai.grok-4.3`으로 설정되어 있습니다.
+
+```sql
+SELECT profile_name, attribute_name, attribute_value
+FROM user_cloud_ai_profile_attributes
+WHERE profile_name = 'TRAIN05_AI'
+  AND attribute_name IN ('provider', 'model', 'credential_name')
+ORDER BY attribute_name;
+```
+
+모델을 바꿀 때는 기존 `object_list`를 유지한 채 프로파일을 재생성합니다. 변경 전에는 임시 프로파일로 `DBMS_CLOUD_AI.GENERATE` 테스트를 먼저 수행하는 것을 권장합니다.
+
+---
+
 ### [부록] Python Streamlit 앱 실행 가이드
 
 본 프로젝트에 포함된 `app.py`는 Streamlit 기반의 웹 대시보드로, SQL Worksheet 없이도 브라우저에서 Select AI Agent와 대화할 수 있는 GUI 환경을 제공합니다.
@@ -1770,6 +2243,7 @@ streamlit run app.py
 | `ORA-00942: table or view does not exist` | Agent 메타데이터 조회 권한 없음 | ADMIN 계정에서 `GRANT SELECT ON DBA_AI_AGENT_*` 실행 (Step 1.2 참조) |
 | `PLS-00201: DBMS_CLOUD_AI_AGENT must be declared` | Agent 패키지 실행 권한 없음 | ADMIN에서 `GRANT EXECUTE ON C##CLOUD$SERVICE.DBMS_CLOUD_AI_AGENT` 실행 |
 | `ORA-06550: insufficient privileges` | LOB 처리 권한 없음 | ADMIN에서 `GRANT EXECUTE ON DBMS_LOB TO NORTHWIND` 실행 |
+| `TRAINxx` 계정에서 프로파일을 찾지 못함 | README 기본값 `NORTHWIND_AI`를 그대로 사용 | OAPC 현장에서는 `USER || '_AI'` 또는 본인 계정명 기반 `TRAINxx_AI` 사용 |
 
 ##### 2. Tool 관련 오류
 
@@ -1778,6 +2252,8 @@ streamlit run app.py
 | PL/SQL Tool이 `function not found` | Tool의 `function` 속성과 실제 함수명 불일치 | `CREATE_TOOL`의 `"function"` 값이 실제 PL/SQL 함수명과 정확히 일치하는지 확인 |
 | SQL Tool이 잘못된 SQL 생성 | AI 프로파일의 메타데이터 부족 | 프로파일의 `comments` 속성을 `true`로, 테이블/컬럼 COMMENT 보강 |
 | WebSearch Tool 오류 | OpenAI Credential 미설정 | `DBMS_CLOUD.CREATE_CREDENTIAL`로 OpenAI API Key 등록 확인 |
+| `PLS-00684: invalid data type for the JSON return value` | 일부 DB 버전에서 `JSON_OBJECT ... RETURNING CLOB` 조합 제한 | 현장용 빠른 실행 SQL처럼 작은 JSON 문자열을 직접 구성하거나 `VARCHAR2`로 전달 |
+| sqlplus에서 한국어가 `?`로 깨짐 | 클라이언트 문자셋이 UTF-8이 아님 | 실행 전 `export NLS_LANG=KOREAN_KOREA.AL32UTF8` 설정. Database Actions 사용 시 보통 불필요 |
 
 ##### 3. Task/Team 오류
 
