@@ -29,6 +29,7 @@ adb_select_ai_agent/
 ├── OAPC_3rd_Field_Practice_Guide.md     # OAPC 3차 현장 실습 기준
 ├── sql/
 │   ├── oapc_admin_prepare_train_users.sql    # 강사용 TRAINxx 계정/권한 준비
+│   ├── oapc_admin_prepare_apex_train_users.sql # 강사용 APEX TRAINxx 로그인 계정 준비
 │   ├── oapc_train_bootstrap_select_ai.sql    # 수강생용 Northwind/Profile 복구
 │   ├── oapc_train_vector_policy_demo.sql     # 수강생용 OCI GenAI embedding/vector 검색 예제
 │   └── oapc_ask_oracle_install_context.sql   # Ask Oracle SQLPlus import context
@@ -1962,7 +1963,7 @@ https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/ap
 | APEX App Builder Import | Oracle 공식 설치 PDF와 동일한 수동 설치 방식 | 최초 설치 또는 화면 설명용 |
 | SQLPlus Import | 강사용 반복 설치/재설치 자동화 방식 | 이미 검증된 데모 환경 재구성용 |
 
-참석자 전원이 Ask Oracle을 각자 설치할 필요는 없습니다. OAPC 3차에서는 강사용 `TRAIN05` parsing schema에 설치된 공식 Ask Oracle 앱을 공유 데모로 사용하고, 수강생은 SQL Worksheet에서 Agent 객체를 직접 만드는 흐름에 집중합니다.
+참석자 전원이 Ask Oracle을 각자 설치할 필요는 없습니다. OAPC 3차에서는 강사용 `TRAIN05` parsing schema에 설치된 공식 Ask Oracle 앱을 공유 데모로 사용하고, 수강생은 같은 URL에 `TRAIN01`~`TRAIN30` APEX 계정으로 로그인합니다. 이 방식은 앱 실행 schema를 수강생별로 바꾸는 것이 아니라, 하나의 공식 앱을 공유하는 운영 방식입니다. 수강생별 `TRAINxx_AI`를 Ask Oracle에서 완전히 분리해서 쓰려면 schema별 앱 사본을 별도 import해야 합니다.
 
 #### 강사용 설치 결과
 
@@ -1979,6 +1980,16 @@ https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/ap
 | Application ID URL | `https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/r/oapc_demo/108/home` |
 | Settings URL | `https://yh0olybn5pqce4n-d8aukro81636mon0.adb.ap-seoul-1.oraclecloudapps.com/ords/r/oapc_demo/askoracle/settings` |
 | 설치 검증 | `Ask Oracle powered by Select AI` 화면 표시 확인 |
+
+수강생 APEX 로그인:
+
+| 항목 | 값 |
+|------|-----|
+| Login URL | 위 Runtime URL과 동일 |
+| Workspace | `OAPC_DEMO` |
+| User | `TRAIN01` ~ `TRAIN30` |
+| Password | `Welcome#12345` |
+| 실행 기준 | App ID `108`, Parsing Schema `TRAIN05`, Profile `TRAIN05_AI` |
 
 공식 앱 import 후 Supporting Objects로 다음 객체가 생성됩니다.
 
@@ -1997,6 +2008,14 @@ https://github.com/oracle-devrel/oracle-autonomous-database-samples/tree/main/ap
 - parsing schema에서 Select AI Profile을 조회/실행할 수 있음
 - Agent 데모를 할 경우 Select AI Agent Team이 생성되어 있음
 - APEX 개발자 계정으로 App Builder import 가능
+
+수강생 APEX 계정은 ADMIN 또는 APEX Instance Admin 권한으로 아래 스크립트를 실행해 준비합니다.
+
+```sql
+DEFINE APEX_WORKSPACE = "OAPC_DEMO"
+DEFINE TRAIN_PASSWORD = "Welcome#12345"
+@2회차/adb_select_ai_agent/sql/oapc_admin_prepare_apex_train_users.sql
+```
 
 OAPC 강사용 데모 기준:
 

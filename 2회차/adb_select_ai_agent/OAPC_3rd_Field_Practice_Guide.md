@@ -389,7 +389,8 @@ END;
 | 공식 설치 메뉴얼 | Oracle DevRel GitHub의 `Ask Oracle App Installation Steps.pdf`와 APEX App Builder Import 방식이 기준 |
 | 현재 README의 App Builder 절차 | 공식 메뉴얼 방향과 맞음 |
 | 현재 README의 SQLPlus 절차 | 공식 export를 반복 설치하기 위한 강사용 자동화 절차. `sql/oapc_ask_oracle_install_context.sql`로 분리 |
-| 현장 운영 | 참석자별 설치가 아니라 강사용 공식 앱 공유 데모로 진행 |
+| 현장 운영 | 참석자별 설치가 아니라 `TRAIN05` parsing schema의 공식 앱을 공유 데모로 진행 |
+| 수강생 로그인 | `TRAIN01`~`TRAIN30` APEX 계정으로 같은 URL 접속 |
 
 강사용 데모 URL:
 
@@ -407,8 +408,13 @@ Ask Oracle에서 사용할 값:
 
 | 모드 | 값 |
 |------|-----|
+| Workspace | `OAPC_DEMO` |
+| Login User | `TRAIN01` ~ `TRAIN30` |
+| Login Password | `Welcome#12345` |
 | NL2SQL Profile | `TRAIN05_AI` |
 | Agent Team | `NORTHWIND_SUPPORT_TEAM` |
+
+주의: 이 Ask Oracle 앱은 App ID `108`, parsing schema `TRAIN05` 기준으로 설치되어 있습니다. 수강생 계정은 접속 계정이며, 앱 내부 Select AI 실행 기준은 `TRAIN05_AI`입니다. 수강생별 `TRAINxx_AI`를 Ask Oracle에서 독립적으로 쓰려면 schema별 앱 사본을 별도로 import해야 합니다.
 
 권장 질문:
 
