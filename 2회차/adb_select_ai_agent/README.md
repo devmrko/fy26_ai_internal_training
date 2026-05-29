@@ -30,7 +30,10 @@ adb_select_ai_agent/
 ├── sql/
 │   ├── oapc_admin_prepare_train_users.sql    # 강사용 TRAINxx 계정/권한 준비
 │   ├── oapc_train_bootstrap_select_ai.sql    # 수강생용 Northwind/Profile 복구
+│   ├── oapc_train_vector_policy_demo.sql     # 수강생용 OCI GenAI embedding/vector 검색 예제
 │   └── oapc_ask_oracle_install_context.sql   # Ask Oracle SQLPlus import context
+├── scripts/
+│   └── oapc_create_vector_credentials_from_oci_config.py  # ~/.oci/config 기반 DBMS_VECTOR credential 생성
 ├── .env.example           # 환경 변수 템플릿 (복사하여 .env 생성)
 ├── .env                   # 실제 환경 변수 (git에 포함되지 않음)
 ├── .gitignore             # git 제외 파일 목록
@@ -1286,6 +1289,44 @@ Select AI Agent는 SQL/PL/SQL 외에도 다양한 내장 tool를 지원합니다
 ##### 7.1 RAG Tool (문서 검색)
 
 **사용 사례**: 제품 매뉴얼, FAQ, 정책 문서 검색
+
+OAPC 현장에서는 Object Storage 기반 RAG 전체 파이프라인 대신, Northwind 고객지원 정책 9개를 DB 테이블에 저장하고 OCI Generative AI `cohere.embed-v4.0`으로 임베딩한 뒤 Oracle `VECTOR` 검색을 수행하는 짧은 예제를 먼저 실행합니다. 이 예제는 `Policy_Vector_Search` PL/SQL Tool로 Agent 시나리오에 연결할 수 있습니다.
+
+강사용 credential 생성:
+
+```bash
+export TNS_ADMIN=/Users/joungminko/devkit/db_conn/Wallet_D8AUKRO81636MON0
+export SQLPLUS_BIN=/Users/joungminko/devkit/instantclient/sqlplus
+python3 2회차/adb_select_ai_agent/scripts/oapc_create_vector_credentials_from_oci_config.py --users TRAIN01-TRAIN30
+```
+
+수강생 계정에서 vector 예제 생성:
+
+```sql
+@2회차/adb_select_ai_agent/sql/oapc_train_vector_policy_demo.sql
+```
+
+한글 질의 예시:
+
+```sql
+SELECT DBMS_LOB.SUBSTR(
+         search_support_policy('주문번호 10248 상품이 파손되었습니다. 반품 승인번호가 필요합니다.', 3),
+         4000,
+         1
+       ) AS search_result
+FROM dual;
+```
+
+```sql
+SELECT DBMS_LOB.SUBSTR(
+         search_support_policy('재고가 없고 입고 예정인 상품은 고객에게 어떻게 안내해야 하나요?', 3),
+         4000,
+         1
+       ) AS search_result
+FROM dual;
+```
+
+이 예제와 아래 Object Storage 기반 RAG Tool은 목적이 다릅니다. 현장 실습은 DB 테이블 기반 Vector Search를 사용하고, 아래 예시는 PDF/문서 파일을 Object Storage에 올려 운영형 RAG로 확장할 때 참고합니다.
 
 ```sql
 -- ===============================================

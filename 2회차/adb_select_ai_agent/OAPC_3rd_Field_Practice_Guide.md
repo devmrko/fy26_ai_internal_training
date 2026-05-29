@@ -72,6 +72,31 @@ Database Actions SQL Worksheet만 사용하는 수강생은 `@파일경로`를 �
 | AI Profile | 현재 사용자 기준 `TRAINxx_AI`를 `xai.grok-4.3`으로 재생성 |
 | 검증 | 테이블별 row count와 Profile 속성 출력 |
 
+벡터 검색까지 포함하는 경우 강사가 먼저 로컬 `~/.oci/config`의 `DEFAULT` API Key로 각 계정에 `GENAI_VECTOR_CRED`를 생성합니다. 이 credential은 `DBMS_VECTOR.UTL_TO_EMBEDDING`에서 OCI Generative AI `cohere.embed-v4.0` 모델을 호출할 때 사용합니다.
+
+```bash
+export TNS_ADMIN=/Users/joungminko/devkit/db_conn/Wallet_D8AUKRO81636MON0
+export SQLPLUS_BIN=/Users/joungminko/devkit/instantclient/sqlplus
+python3 2회차/adb_select_ai_agent/scripts/oapc_create_vector_credentials_from_oci_config.py --users TRAIN01-TRAIN30
+```
+
+수강생 또는 강사가 각 계정에서 실행:
+
+```sql
+@2회차/adb_select_ai_agent/sql/oapc_train_vector_policy_demo.sql
+```
+
+이 vector demo 스크립트가 수행하는 일:
+
+| 항목 | 내용 |
+|------|------|
+| 임베딩 모델 | OCI Generative AI `cohere.embed-v4.0` |
+| 테이블 | `SUPPORT_POLICY_VECTORS` |
+| 벡터 컬럼 | `DOC_VECTOR VECTOR(1536, FLOAT32)` |
+| 문서 | 반품, 환불, 배송 지연, 주소 변경, 재고/품절, 단종, 할인/견적, 주문금액 정책 9개 |
+| 인덱스 | `IDX_SUPPORT_POLICY_VEC` vector index |
+| 검색 함수 | `SEARCH_SUPPORT_POLICY(p_question, p_top_k)` |
+
 테이블 구조가 잘못 만들어져 bootstrap이 실패하면, 해당 수강생 계정에서 아래 reset block으로 실습 객체만 지운 뒤 bootstrap을 다시 실행합니다.
 
 ```sql
@@ -214,6 +239,8 @@ BEGIN DBMS_CLOUD_AI_AGENT.DROP_TOOL('SQL_Analysis_Tool'); EXCEPTION WHEN OTHERS 
 /
 BEGIN DBMS_CLOUD_AI_AGENT.DROP_TOOL('Return_Auth_Generator'); EXCEPTION WHEN OTHERS THEN NULL; END;
 /
+BEGIN DBMS_CLOUD_AI_AGENT.DROP_TOOL('Policy_Vector_Search'); EXCEPTION WHEN OTHERS THEN NULL; END;
+/
 
 DECLARE
   l_profile VARCHAR2(128) := USER || '_AI';
@@ -230,9 +257,15 @@ BEGIN
     description => 'Generates RMA numbers for product returns.'
   );
 
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name   => 'Policy_Vector_Search',
+    attributes  => '{"instruction":"Use this tool when the user asks about Northwind support policy, return policy, refund timing, damaged item handling, shipping delay, shipping address changes, out-of-stock/backorder guidance, discontinued products, discounts, quotes, or order total explanation. Required parameters: p_question string with the user question in Korean or English, and optional p_top_k number. Return the most relevant policy snippets from SUPPORT_POLICY_VECTORS.","function":"search_support_policy"}',
+    description => 'Searches embedded Northwind support policy snippets using OCI GenAI cohere.embed-v4.0 embeddings and Oracle VECTOR search.'
+  );
+
   DBMS_CLOUD_AI_AGENT.CREATE_TASK(
     task_name => 'Customer_Service_Task',
-    attributes => '{"instruction":"You are a customer service agent for Northwind Traders. User request: {query}. Workflow: (1) For product/order/customer/inventory/sales lookup questions, use SQL_Analysis_Tool. (2) If the user asks for return, refund, RMA, 반품, 환불, or 반품 승인번호 and gives an order number, call Return_Auth_Generator. Extract order_id from the order number and set reason to the user stated reason such as defective, damaged, 파손, 불량. Do not only look up the order when a return authorization is requested. (3) If order_id is missing, ask for it. Answer in Korean unless the user asks otherwise.","tools":["SQL_Analysis_Tool","Return_Auth_Generator"],"enable_human_tool":true}'
+    attributes => '{"instruction":"You are a customer service agent for Northwind Traders. User request: {query}. Workflow: (1) For product/order/customer/inventory/sales lookup questions that require database facts, use SQL_Analysis_Tool. (2) For support policy questions about 반품, 환불, 파손, 불량, 배송 지연, 주소 변경, 재고 안내, 품절, 단종, 할인, 견적, or 주문금액 설명, use Policy_Vector_Search first to retrieve the relevant policy snippet, then answer in Korean. (3) If the user asks for return, refund, RMA, 반품, 환불, or 반품 승인번호 and gives an order number, call Return_Auth_Generator after checking the relevant policy. Extract order_id from the order number and set reason to the user stated reason such as defective, damaged, 파손, 불량. Do not only look up the order when a return authorization is requested. (4) If order_id is missing, ask for it. Answer in Korean unless the user asks otherwise.","tools":["SQL_Analysis_Tool","Return_Auth_Generator","Policy_Vector_Search"],"enable_human_tool":true}'
   );
 
   DBMS_CLOUD_AI_AGENT.CREATE_AGENT(
@@ -294,6 +327,35 @@ SELECT return_id, rma_number, order_id, reason, status, created_date
 FROM returns
 ORDER BY return_id DESC
 FETCH FIRST 5 ROWS ONLY;
+```
+
+Vector 정책 검색 검증:
+
+```sql
+SELECT DBMS_LOB.SUBSTR(
+         search_support_policy('재고가 없고 입고 예정인 상품은 고객에게 어떻게 안내해야 하나요?', 3),
+         4000,
+         1
+       ) AS search_result
+FROM dual;
+```
+
+Agent에서 Vector 정책 검색 Tool 호출 검증:
+
+```sql
+DECLARE
+  l_res     CLOB;
+  l_conv_id VARCHAR2(100);
+BEGIN
+  l_conv_id := DBMS_CLOUD_AI.CREATE_CONVERSATION();
+  l_res := run_team_clob(
+             p_team_name   => 'Northwind_Support_Team',
+             p_user_prompt => '재고가 없고 입고 예정인 상품은 고객에게 어떻게 안내해야 하나요? 관련 정책을 찾아서 한국어로 답변해 주세요.',
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
+           );
+  DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
+END;
+/
 ```
 
 ## Ask Oracle Demo 연결
