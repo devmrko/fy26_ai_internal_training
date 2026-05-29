@@ -1327,7 +1327,40 @@ SELECT DBMS_LOB.SUBSTR(
 FROM dual;
 ```
 
-##### 7.1.1 Vector Search를 PL/SQL Tool로 등록
+##### 7.1.1 `search_support_policy` 함수 명세
+
+`oapc_train_vector_policy_demo.sql`은 수강생 계정에 아래 PL/SQL 함수를 생성합니다. 이 함수는 Select AI Agent에 연결하기 위한 벡터 검색 wrapper이며, RAG Tool 타입이 아니라 **PL/SQL Tool**로 등록해서 사용합니다.
+
+```sql
+search_support_policy(
+  p_question IN VARCHAR2,
+  p_top_k    IN NUMBER DEFAULT 3
+) RETURN CLOB
+```
+
+| 항목 | 명세 |
+|------|------|
+| 목적 | 한글/영문 고객지원 정책 질문을 임베딩한 뒤 가장 가까운 정책 문서를 반환 |
+| 입력 `p_question` | 사용자의 자연어 질문. 예: `재고가 없고 입고 예정인 상품은 고객에게 어떻게 안내해야 하나요?` |
+| 입력 `p_top_k` | 반환할 정책 조각 수. 기본값 3, 함수 내부에서 1~5 범위로 보정 |
+| 내부 임베딩 | `SUPPORT_POLICY_QUERY_VECTOR`가 `DBMS_VECTOR.UTL_TO_EMBEDDING` 호출 |
+| 임베딩 Credential | `GENAI_VECTOR_CRED` |
+| 임베딩 모델 | OCI Generative AI `cohere.embed-v4.0` |
+| 검색 대상 | `SUPPORT_POLICY_VECTORS.DOC_VECTOR VECTOR(1536, FLOAT32)` |
+| Vector Index | `IDX_SUPPORT_POLICY_VEC` |
+| 거리 함수 | `VECTOR_DISTANCE(..., COSINE)` 기준 오름차순 |
+| 반환 | Agent가 읽기 쉬운 plain text `CLOB` |
+
+반환 `CLOB`은 검색 결과마다 아래 형식의 block을 이어 붙입니다.
+
+```text
+[doc_id] title / area=POLICY_AREA / distance=0.xxxx
+policy snippet text
+```
+
+Agent Tool 등록 시 함수명은 반드시 `search_support_policy`로 지정하고, instruction에는 `p_question`이 필수이며 `p_top_k`는 선택 입력이라는 점을 명시합니다.
+
+##### 7.1.2 Vector Search를 PL/SQL Tool로 등록
 
 `oapc_train_vector_policy_demo.sql`이 생성하는 `search_support_policy(p_question, p_top_k)` 함수는 일반 PL/SQL 함수이므로 Select AI Agent의 PL/SQL Tool로 등록할 수 있습니다. 이렇게 등록하면 Agent가 SQL 조회, 반품 승인번호 생성, 정책 문서 검색을 같은 Task 안에서 선택해 사용할 수 있습니다.
 

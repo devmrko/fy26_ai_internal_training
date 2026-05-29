@@ -97,6 +97,26 @@ python3 2회차/adb_select_ai_agent/scripts/oapc_create_vector_credentials_from_
 | 인덱스 | `IDX_SUPPORT_POLICY_VEC` vector index |
 | 검색 함수 | `SEARCH_SUPPORT_POLICY(p_question, p_top_k)` |
 
+`SEARCH_SUPPORT_POLICY` 함수 명세:
+
+```sql
+search_support_policy(
+  p_question IN VARCHAR2,
+  p_top_k    IN NUMBER DEFAULT 3
+) RETURN CLOB
+```
+
+| 항목 | 명세 |
+|------|------|
+| 역할 | 한글/영문 정책 질문을 vector로 변환하고 `SUPPORT_POLICY_VECTORS`에서 관련 정책 조각 검색 |
+| `p_question` | 필수 자연어 질문. 예: `주문번호 10248 상품이 파손되었습니다. 반품 승인번호가 필요합니다.` |
+| `p_top_k` | 선택 결과 수. 기본값 3, 내부에서 1~5 범위로 보정 |
+| 내부 호출 | `SUPPORT_POLICY_QUERY_VECTOR` -> `DBMS_VECTOR.UTL_TO_EMBEDDING` |
+| Credential/Model | `GENAI_VECTOR_CRED`, OCI Generative AI `cohere.embed-v4.0` |
+| 검색 기준 | `DOC_VECTOR VECTOR(1536, FLOAT32)`와 query vector의 cosine distance |
+| 반환 형식 | `[doc_id] title / area=POLICY_AREA / distance=0.xxxx` 다음 줄에 정책 본문 일부를 붙인 plain text `CLOB` |
+| Agent 등록 | `Policy_Vector_Search` PL/SQL Tool의 `"function"` 값은 `search_support_policy` |
+
 테이블 구조가 잘못 만들어져 bootstrap이 실패하면, 해당 수강생 계정에서 아래 reset block으로 실습 객체만 지운 뒤 bootstrap을 다시 실행합니다.
 
 ```sql
