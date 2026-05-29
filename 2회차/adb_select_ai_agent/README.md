@@ -776,8 +776,8 @@ GROUP BY TOOL_NAME;
 
 | **TASK: Customer_Service_Task** |
 |:---|
-| **[지침]**<br>• 제품 문의 → SQL Tool 사용<br>• 반품 요청 → RMA Generator 사용<br>• 정보 부족 시 → 사용자에게 질문<br>• 이메일 발송은 Step 7.3 선택 실습에서 별도 구성 |
-| **[사용 가능 tool]**<br>✓ SQL_Analysis_Tool<br>✓ Return_Auth_Generator<br>✓ Human_Tool (자동 활성화)<br>✓ EMAIL_NOTIFY (Step 7.3 선택) |
+| **[지침]**<br>• 제품 문의 → SQL Tool 사용<br>• 반품 요청 → RMA Generator 사용<br>• 정책/FAQ 문의 → Step 7.1에서 Vector Search Tool 추가<br>• 정보 부족 시 → 사용자에게 질문<br>• 이메일 발송은 Step 7.3 선택 실습에서 별도 구성 |
+| **[사용 가능 tool]**<br>✓ SQL_Analysis_Tool<br>✓ Return_Auth_Generator<br>✓ Policy_Vector_Search (Step 7.1 선택)<br>✓ Human_Tool (자동 활성화)<br>✓ EMAIL_NOTIFY (Step 7.3 선택) |
 
 
 ##### 3.2 Task 생성
@@ -810,7 +810,8 @@ BEGIN
                            '2. If the user asks for return, refund, RMA, 반품, 환불, or 반품 승인번호 and gives an order number, call Return_Auth_Generator. ' ||
                            '3. Extract order_id from the order number and set reason to the user stated reason such as defective, damaged, 파손, 불량. ' ||
                            '4. If order_id is missing, ask a concise follow-up question. ' ||
-                           '5. Answer in Korean unless the user asks otherwise.',
+                           '5. Answer in Korean unless the user asks otherwise. ' ||
+                           '6. Policy_Vector_Search is added later in Step 7.1 when the vector policy demo is enabled.',
         'tools' VALUE JSON_ARRAY('SQL_Analysis_Tool', 'Return_Auth_Generator'),
         'enable_human_tool' VALUE true
     );
@@ -1324,6 +1325,129 @@ SELECT DBMS_LOB.SUBSTR(
          1
        ) AS search_result
 FROM dual;
+```
+
+##### 7.1.1 Vector Search를 PL/SQL Tool로 등록
+
+`oapc_train_vector_policy_demo.sql`이 생성하는 `search_support_policy(p_question, p_top_k)` 함수는 일반 PL/SQL 함수이므로 Select AI Agent의 PL/SQL Tool로 등록할 수 있습니다. 이렇게 등록하면 Agent가 SQL 조회, 반품 승인번호 생성, 정책 문서 검색을 같은 Task 안에서 선택해 사용할 수 있습니다.
+
+```sql
+-- ===============================================
+-- Vector Search PL/SQL Tool 등록
+-- 실행 계정: TRAINxx 또는 NORTHWIND
+-- 전제조건:
+--   1. oapc_train_vector_policy_demo.sql 실행 완료
+--   2. search_support_policy 함수와 SUPPORT_POLICY_VECTORS 테이블 존재
+-- ===============================================
+
+BEGIN
+  DBMS_CLOUD_AI_AGENT.DROP_TOOL('Policy_Vector_Search');
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END;
+/
+
+BEGIN
+  DBMS_CLOUD_AI_AGENT.CREATE_TOOL(
+    tool_name   => 'Policy_Vector_Search',
+    attributes  => '{
+      "instruction": "Use this tool when the user asks about Northwind support policy, return policy, refund timing, damaged item handling, shipping delay, shipping address changes, out-of-stock/backorder guidance, discontinued products, discounts, quotes, or order total explanation. Required parameters: p_question string with the user question in Korean or English, and optional p_top_k number. Return the most relevant policy snippets from SUPPORT_POLICY_VECTORS.",
+      "function": "search_support_policy"
+    }',
+    description => 'Searches embedded Northwind support policy snippets using OCI GenAI cohere.embed-v4.0 embeddings and Oracle VECTOR search.'
+  );
+END;
+/
+```
+
+기존 `Customer_Service_Task`에 Vector Search Tool을 추가합니다.
+
+```sql
+-- ===============================================
+-- Customer_Service_Task를 Vector Search 포함 버전으로 갱신
+-- 실행 계정: TRAINxx 또는 NORTHWIND
+-- 전제조건:
+--   SQL_Analysis_Tool, Return_Auth_Generator, Policy_Vector_Search 생성 완료
+-- ===============================================
+
+BEGIN
+  DBMS_CLOUD_AI_AGENT.DROP_TASK('Customer_Service_Task');
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END;
+/
+
+DECLARE
+  v_attributes CLOB;
+BEGIN
+  v_attributes := JSON_OBJECT(
+    'instruction' VALUE
+      'You are a customer service agent for Northwind Traders. User request: {query}. ' ||
+      '1. For product/order/customer/inventory/sales lookup questions that require database facts, use SQL_Analysis_Tool. ' ||
+      '2. For support policy questions about 반품, 환불, 파손, 불량, 배송 지연, 주소 변경, 재고 안내, 품절, 단종, 할인, 견적, or 주문금액 설명, use Policy_Vector_Search first to retrieve the relevant policy snippet, then answer in Korean. ' ||
+      '3. If the user asks for return, refund, RMA, 반품, 환불, or 반품 승인번호 and gives an order number, call Return_Auth_Generator after checking the relevant policy. ' ||
+      '4. Extract order_id from the order number and set reason to the user stated reason such as defective, damaged, 파손, 불량. ' ||
+      '5. If order_id is missing, ask a concise follow-up question. ' ||
+      '6. Answer in Korean unless the user asks otherwise.',
+    'tools' VALUE JSON_ARRAY(
+      'SQL_Analysis_Tool',
+      'Return_Auth_Generator',
+      'Policy_Vector_Search'
+    ),
+    'enable_human_tool' VALUE true
+  );
+
+  DBMS_CLOUD_AI_AGENT.CREATE_TASK(
+    task_name  => 'Customer_Service_Task',
+    attributes => v_attributes
+  );
+END;
+/
+```
+
+Agent Team은 같은 `Northwind_Support_Team`을 다시 만들면 갱신된 Task를 사용합니다.
+
+```sql
+BEGIN
+  DBMS_CLOUD_AI_AGENT.DROP_TEAM(team_name => 'Northwind_Support_Team', force => TRUE);
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END;
+/
+
+BEGIN
+  DBMS_CLOUD_AI_AGENT.CREATE_TEAM(
+    team_name  => 'Northwind_Support_Team',
+    attributes => '{
+      "agents": [
+        {
+          "name": "Northwind_Support_Bot",
+          "task": "Customer_Service_Task"
+        }
+      ],
+      "process": "sequential"
+    }'
+  );
+END;
+/
+```
+
+Agent에서 한글 정책 검색 질문을 실행합니다.
+
+```sql
+DECLARE
+  l_res     CLOB;
+  l_conv_id VARCHAR2(100);
+BEGIN
+  l_conv_id := DBMS_CLOUD_AI.CREATE_CONVERSATION();
+  l_res := run_team_clob(
+             p_team_name   => 'Northwind_Support_Team',
+             p_user_prompt => '재고가 없고 입고 예정인 상품은 고객에게 어떻게 안내해야 하나요? 관련 정책을 찾아서 한국어로 답변해 주세요.',
+             p_params      => '{"conversation_id": "' || l_conv_id || '"}'
+           );
+  DBMS_OUTPUT.PUT_LINE(DBMS_LOB.SUBSTR(l_res, 4000, 1));
+END;
+/
 ```
 
 이 예제와 아래 Object Storage 기반 RAG Tool은 목적이 다릅니다. 현장 실습은 DB 테이블 기반 Vector Search를 사용하고, 아래 예시는 PDF/문서 파일을 Object Storage에 올려 운영형 RAG로 확장할 때 참고합니다.
